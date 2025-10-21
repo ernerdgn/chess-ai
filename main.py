@@ -39,6 +39,7 @@ def main():
                 if e.key == p.K_u:
                     gs.undo_move()
                     move_made = True
+                    # game_over = False # reset
             elif e.type == p.MOUSEBUTTONDOWN:
                 if not game_over:
                     location = p.mouse.get_pos()  #(x,y)
@@ -53,11 +54,24 @@ def main():
 
                     if len(player_clicks) == 2:
                         move = engine.Move(player_clicks[0], player_clicks[1], gs.board)
-                        #print("1111")
+                        #print("two clicks")
                         for i in range(len(valid_moves)):
                             if move == valid_moves[i]:
-                                #print("2222")
-                                gs.make_move(valid_moves[i])
+
+                                print("=====before making move")
+                                for c_idx in range(8):
+                                    pawn = gs.board[6][c_idx]
+                                    if pawn is not None and pawn.type == 'p':
+                                        print(f"Pawn at (6,{c_idx}) has_moved: {pawn.has_moved} (ID: {id(pawn)})")
+                                
+                                gs.make_move(valid_moves[i])  # make move
+
+                                print("=====after making move")
+                                for c_idx in range(8):
+                                    pawn = gs.board[6][c_idx]
+                                    if pawn is not None and pawn.type == 'p':
+                                        print(f"Pawn at (6,{c_idx}) has_moved: {pawn.has_moved} (ID: {id(pawn)})")
+
                                 print(move.get_chess_notation())
                                 move_made = True
                                 sq_selected = () # reset clicks
@@ -65,7 +79,6 @@ def main():
                                 break
                         if not move_made:
                             player_clicks = [sq_selected]
-                            #print("3333")
         if move_made:
             valid_moves = gs.get_legal_moves()
             move_made = False
@@ -100,8 +113,9 @@ def draw_pieces(screen, board):
     for r in range(DIMENSION):
         for c in range(DIMENSION):
             piece = board[r][c]
-            if piece != "--":
-                screen.blit(IMAGES[piece], p.Rect(c*SQ_SIZE, r*SQ_SIZE, SQ_SIZE, SQ_SIZE))
+            if piece is not None:
+                image_name = piece.color + piece.type
+                screen.blit(IMAGES[image_name], p.Rect(c*SQ_SIZE, r*SQ_SIZE, SQ_SIZE, SQ_SIZE))
 
 
 if __name__ == "__main__":
