@@ -52,33 +52,62 @@ def main():
                         sq_selected = (row, col)
                         player_clicks.append(sq_selected)
 
+                    if len(player_clicks) == 1:
+                        if gs.board[row][col] is None:  #if clicked to an empty square
+                            sq_selected = ()
+                            player_clicks = []
+
                     if len(player_clicks) == 2:
-                        move = engine.Move(player_clicks[0], player_clicks[1], gs.board)
-                        #print("two clicks")
-                        for i in range(len(valid_moves)):
-                            if move == valid_moves[i]:
+                        start_piece = gs.board[player_clicks[0][0]][player_clicks[0][1]]
 
-                                print("=====before making move")
-                                for c_idx in range(8):
-                                    pawn = gs.board[6][c_idx]
-                                    if pawn is not None and pawn.type == 'p':
-                                        print(f"Pawn at (6,{c_idx}) has_moved: {pawn.has_moved} (ID: {id(pawn)})")
+                        if start_piece is not None:
+                            move = engine.Move(player_clicks[0], player_clicks[1], gs.board)
+                            for i in range(len(valid_moves)):
+                                if move == valid_moves[i]:
+                                    gs.make_move(valid_moves[i])
+                                    print(move.get_chess_notation())
+                                    move_made = True
+                                    sq_selected = ()
+                                    player_clicks = []
+                                    break
+                            if not move_made:
+                                end_piece = gs.board[player_clicks[1][0]][player_clicks[1][1]]
+                                if end_piece is not None and end_piece.color == start_piece.color:
+                                    sq_selected = player_clicks[1]
+                                    player_clicks = [sq_selected]
+                                else:
+                                    sq_selected = ()
+                                    player_clicks = []
+                        else:
+                            sq_selected = ()
+                            player_clicks = []
+
+                        # move = engine.Move(player_clicks[0], player_clicks[1], gs.board)
+                        # #print("two clicks")
+                        # for i in range(len(valid_moves)):
+                        #     if move == valid_moves[i]:
+
+                        #         print("=====before making move")
+                        #         for c_idx in range(8):
+                        #             pawn = gs.board[6][c_idx]
+                        #             if pawn is not None and pawn.type == 'p':
+                        #                 print(f"Pawn at (6,{c_idx}) has_moved: {pawn.has_moved} (ID: {id(pawn)})")
                                 
-                                gs.make_move(valid_moves[i])  # make move
+                        #         gs.make_move(valid_moves[i])  # make move
 
-                                print("=====after making move")
-                                for c_idx in range(8):
-                                    pawn = gs.board[6][c_idx]
-                                    if pawn is not None and pawn.type == 'p':
-                                        print(f"Pawn at (6,{c_idx}) has_moved: {pawn.has_moved} (ID: {id(pawn)})")
+                        #         print("=====after making move")
+                        #         for c_idx in range(8):
+                        #             pawn = gs.board[6][c_idx]
+                        #             if pawn is not None and pawn.type == 'p':
+                        #                 print(f"Pawn at (6,{c_idx}) has_moved: {pawn.has_moved} (ID: {id(pawn)})")
 
-                                print(move.get_chess_notation())
-                                move_made = True
-                                sq_selected = () # reset clicks
-                                player_clicks = []
-                                break
-                        if not move_made:
-                            player_clicks = [sq_selected]
+                        #         print(move.get_chess_notation())
+                        #         move_made = True
+                        #         sq_selected = () # reset clicks
+                        #         player_clicks = []
+                        #         break
+                        # if not move_made:
+                        #     player_clicks = [sq_selected]
         if move_made:
             valid_moves = gs.get_legal_moves()
             move_made = False
