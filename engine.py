@@ -33,7 +33,14 @@ class GameState():
 
     def make_move(self, move):  # no castle, promo, en pass
         self.board[move.start_row][move.start_col] = None
-        self.board[move.end_row][move.end_col] = move.piece_moved
+
+        if move.is_promotion:
+            promo_piece = Piece(move.piece_moved.color, move.promotion_choice)
+            self.board[move.end_row][move.end_col] = promo_piece
+        else:
+            self.board[move.end_row][move.end_col] = move.piece_moved
+
+
         self.move_log.append(move)
         self.white_to_move = not self.white_to_move
         
@@ -82,7 +89,6 @@ class GameState():
             if move.is_en_passant:
                 self.board[move.end_row][move.end_col] = None
                 self.board[move.start_row][move.end_col] = move.piece_captured
-
 
             # castling
             self.castle_rights_log.pop()
@@ -369,6 +375,14 @@ class Move():
             self.was_first_move = not self.piece_moved.has_moved
 
         self.is_castle_move = is_castle
+
+        # promotion
+        self.is_promotion = False
+        if self.piece_moved is not None and self.piece_moved.type == 'p':
+            if (self.piece_moved.color == 'w' and self.end_row == 0) or \
+                (self.piece_moved.color == 'b' and self.end_row == 7):
+                self.is_promotion = True
+        self.promotion_choice = None
 
     def __eq__(self, other):
         if isinstance(other, Move):

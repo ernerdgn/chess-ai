@@ -31,15 +31,33 @@ def main():
     player_clicks = []
     game_over = False
 
+    promotion_pending = False
+    pending_move = None
+    promotion_clicks = []
+
     while running:
+        turn = 'w' if gs.white_to_move else 'b'
+
         for e in p.event.get():
             if e.type == p.QUIT:
                 running = False
-            elif e.type == p.KEYDOWN:
-                if e.key == p.K_u:
-                    gs.undo_move()
-                    move_made = True
-                    # game_over = False # reset
+            
+            elif e.type == p.MOUSEBUTTONDOWN and promotion_pending:
+                location = p.mouse.get_pos()
+                for i, rect in enumerate(promotion_clicks):
+                    if rect.collidepoint(location):
+                        choice = ['Q', 'R', 'B', 'N'][i]
+                        pending_move.promotion_choice = choice
+                        gs.make_move(pending_move)
+                        print(f"promoted to  {choice}")
+
+                        promotion_pending = False
+                        pending_move = None
+                        move_made = True
+                        sq_selected = ()
+                        promotion_clicks = []
+                        break
+
             elif e.type == p.MOUSEBUTTONDOWN:
                 if not game_over:
                     location = p.mouse.get_pos()  #(x,y)
@@ -64,13 +82,19 @@ def main():
                             move = engine.Move(player_clicks[0], player_clicks[1], gs.board)
                             for i in range(len(valid_moves)):
                                 if move == valid_moves[i]:
-                                    gs.make_move(valid_moves[i])
-                                    print(move.get_chess_notation())
-                                    move_made = True
+                                    if move.is_promotion: # check for promotion
+                                        promotion_pending = True
+                                        pending_move = move
+                                    else:
+                                        gs.make_move(valid_moves[i])
+                                        print(move.get_chess_notation())
+                                        move_made = True
+                                    
                                     sq_selected = ()
                                     player_clicks = []
                                     break
-                            if not move_made:
+                            
+                            if not move_made and not promotion_pending:
                                 end_piece = gs.board[player_clicks[1][0]][player_clicks[1][1]]
                                 if end_piece is not None and end_piece.color == start_piece.color:
                                     sq_selected = player_clicks[1]
@@ -82,39 +106,24 @@ def main():
                             sq_selected = ()
                             player_clicks = []
 
-                        # move = engine.Move(player_clicks[0], player_clicks[1], gs.board)
-                        # #print("two clicks")
-                        # for i in range(len(valid_moves)):
-                        #     if move == valid_moves[i]:
+            elif e.type == p.KEYDOWN:
+                if e.key == p.K_u:
+                    gs.undo_move()
+                    move_made = True
+                    # game_over = False # reset
+                    promotion_pending = False
+                    pending_move = None
 
-                        #         print("=====before making move")
-                        #         for c_idx in range(8):
-                        #             pawn = gs.board[6][c_idx]
-                        #             if pawn is not None and pawn.type == 'p':
-                        #                 print(f"Pawn at (6,{c_idx}) has_moved: {pawn.has_moved} (ID: {id(pawn)})")
-                                
-                        #         gs.make_move(valid_moves[i])  # make move
-
-                        #         print("=====after making move")
-                        #         for c_idx in range(8):
-                        #             pawn = gs.board[6][c_idx]
-                        #             if pawn is not None and pawn.type == 'p':
-                        #                 print(f"Pawn at (6,{c_idx}) has_moved: {pawn.has_moved} (ID: {id(pawn)})")
-
-                        #         print(move.get_chess_notation())
-                        #         move_made = True
-                        #         sq_selected = () # reset clicks
-                        #         player_clicks = []
-                        #         break
-                        # if not move_made:
-                        #     player_clicks = [sq_selected]
         if move_made:
             valid_moves = gs.get_legal_moves()
             move_made = False
 
         draw_game_state(screen, gs)
 
-        if len(valid_moves) == 0:
+        if promotion_pending:
+            promotion_clicks = draw_promotion_menu(screen, turn)
+
+        if len(valid_moves) == 0 and not promotion_pending:
             game_over = True
             if gs.in_check():
                 print("checkmate")
@@ -122,7 +131,6 @@ def main():
             else:
                 print("stalemate")
                 running = False
-
 
         clock.tick(MAX_FPS)
         p.display.flip()
@@ -146,6 +154,22 @@ def draw_pieces(screen, board):
                 image_name = piece.color + piece.type
                 screen.blit(IMAGES[image_name], p.Rect(c*SQ_SIZE, r*SQ_SIZE, SQ_SIZE, SQ_SIZE))
 
+def draw_promotion_menu(screen, turn):
+    menu_x = (WIDTH // 2) - (2 * SQ_SIZE)
+    menu_y = (HEIGHT // 2) - (SQ_SIZE // 2)
+    menu_rect = p.Rect(menu_x, menu_y, 4 * SQ_SIZE, SQ_SIZE)
+    p.draw.rect(screen, p.Color("black"), menu_rect)
+    p.draw.rect(screen, p.Color("white"), menu_rect.inflate(4,4), 2)
+
+    pieces = ['Q', 'R', 'B', 'N']
+    for i, piece in enumerate(pieces):
+        image_name = turn + piece
+        screen.blit(IMAGES[image_name], menu_rect.move(i * SQ_SIZE, 0))
+    
+    clicks = []
+    for i in range(4):
+        clicks.append(p.Rect(menu_x + (i * SQ_SIZE), menu_y, SQ_SIZE, SQ_SIZE))
+    return clicks
 
 if __name__ == "__main__":
     main()
