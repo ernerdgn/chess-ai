@@ -152,6 +152,7 @@ def main():
 
 def draw_game_state(screen, gs, valid_moves, sq_selected):
     draw_board(screen)
+    draw_check_highlight(screen, gs)
     highlight_squares(screen, gs, valid_moves, sq_selected)
     draw_pieces(screen, gs.board)
 
@@ -202,6 +203,18 @@ def highlight_squares(screen, gs, valid_moves, sq_selected):
             for move in valid_moves:
                 if move.start_row == r and move.start_col == c:
                     screen.blit(s, (move.end_col * SQ_SIZE, move.end_row * SQ_SIZE))
+
+def draw_check_highlight(screen, gs):
+    if gs.in_check():
+        color = 'w' if gs.white_to_move else 'b'
+        king_pos = gs.find_king(color)
+
+        if king_pos:
+            r, c = king_pos
+            s = p.Surface((SQ_SIZE, SQ_SIZE))
+            s.set_alpha(150)
+            s.fill(p.Color('red'))
+            screen.blit(s, (c * SQ_SIZE, r * SQ_SIZE))
 
 if __name__ == "__main__":
     main()
