@@ -123,14 +123,29 @@ def main():
         if promotion_pending:
             promotion_clicks = draw_promotion_menu(screen, turn)
 
-        if len(valid_moves) == 0 and not promotion_pending:
-            game_over = True
-            if gs.in_check():
-                print("checkmate")
-                running = False
-            else:
-                print("stalemate")
-                running = False
+        if not game_over:
+            if len(valid_moves) == 0 and not promotion_pending:
+                game_over = True
+                if gs.in_check():
+                    print("checkmate")
+                    running = False
+                else:
+                    print("stalemate")
+                    running = False
+
+            current_hash = gs.get_game_state_hash()
+            #print(gs.position_history.get(current_hash, 0))
+            if gs.position_history.get(current_hash, 0) >= 3:
+                game_over = True
+                print("draw by threefold repetition")
+            
+            if gs.fifty_move_counter >= 100: # a play for each side counts as one move
+                game_over = True
+                print("drawn by fifty-move rule")
+
+            if gs.check_insufficient_material():
+                game_over = True
+                print("draw by insufficient material")
 
         clock.tick(MAX_FPS)
         p.display.flip()

@@ -31,6 +31,30 @@ class GameState():
         self.en_passant_target = None # (r,c) of target square
         self.en_passant_log = [self.en_passant_target]
 
+        self.fifty_move_counter = 0
+        self.fifty_move_log = [0]
+
+        self.position_history = {}
+
+        self.position_history[self.get_game_state_hash()] = 1
+
+    def get_game_state_hash(self):
+        board_string = ""
+        for r in range(8):
+            for c in range(8):
+                piece = self.board[r][c]
+                if piece is None:
+                    board_string += "--"
+                else:
+                    board_string += piece.color + piece.type
+        return (
+            board_string,
+            self.white_to_move,
+            self.castle_rights.wks, self.castle_rights.wqs,
+            self.castle_rights.bks, self.castle_rights.bqs,
+            self.en_passant_target
+        )
+
     def make_move(self, move):  # no castle, promo, en pass
         self.board[move.start_row][move.start_col] = None
 
@@ -56,6 +80,14 @@ class GameState():
 
         self.en_passant_log.append(self.en_passant_target)
 
+        # fifty-move rule
+        # no pawn plays or no captures in 50 move
+        if move.piece_moved.type == 'p' or move.piece_captured is not None:
+            self.fifty_move_counter = 0
+        else:
+            self.fifty_move_counter += 1
+        self.fifty_move_log.append(self.fifty_move_counter)
+
         # castling
         if move.is_castle_move:
             if move.end_col - move.start_col == 2:
@@ -71,7 +103,14 @@ class GameState():
         self.update_castle_rights(move)
         self.castle_rights_log.append(self.castle_rights.copy())
 
+        new_hash = self.get_game_state_hash()
+        self.position_history[new_hash] = self.position_history.get(new_hash, 0) + 1
+
     def undo_move(self):
+        current_hash = self.get_game_state_hash()
+        if current_hash in self.position_history:
+            self.position_history[current_hash] -= 1
+
         if len(self.move_log) != 0: # is there any moves
             move = self.move_log.pop()
             self.board[move.start_row][move.start_col] = move.piece_moved
@@ -88,6 +127,10 @@ class GameState():
             if move.is_en_passant:
                 self.board[move.end_row][move.end_col] = None
                 self.board[move.start_row][move.end_col] = move.piece_captured
+
+            # fifty-move rule
+            self.fifty_move_log.pop()
+            self.fifty_move_counter = self.fifty_move_log[-1]
 
             # castling
             self.castle_rights_log.pop()
@@ -336,6 +379,60 @@ class GameState():
         if self.board[r][c-1] is None and self.board[r][c-2] is None and self.board[r][c-3] is None:
             if not self.square_under_attack(r, c-1) and not self.square_under_attack(r, c-2):
                 moves.append(Move((r, c), (r, c-2), self.board, is_castle=True))
+
+    def check_insufficient_material(self):
+        w_pawns = 0
+        b_pawns = 0
+        w_majors = 0 # Rs and Qs
+        b_majors = 0
+        w_knights = 0
+        b_knights = 0
+        w_bishops = [] # square colors (0: light, 1: dark)
+        b_bishops = []
+
+        for r in range(8):
+            for c in range(8):
+                piece = self.board[r][c]
+                if piece is not None:
+                    if piece.type == 'p':
+                        if piece.color == 'w': w_pawns += 1
+                        else: b_pawns += 1
+                    elif piece.type == 'R' or piece.type == 'Q':
+                        if piece.color == 'w': w_majors += 1
+                        else: b_majors += 1
+                    elif piece.type == 'N':
+                        if piece.color == 'w': w_knights += 1
+                        else: b_knights += 1
+                    elif piece.type == 'B':
+                        square_color = (r + c) % 2
+                        if piece.color == 'w': w_bishops.append(square_color)
+                        else: b_bishops.append(square_color)
+        
+        # pawns, rooks, queens
+        if w_pawns > 0 or b_pawns > 0 or w_majors > 0 or b_majors > 0:
+            return False
+        
+        # more than one minor piece on either side
+        if w_knights + len(w_bishops) > 1 or b_knights + len(b_bishops) > 1:
+            return False
+        
+        # stalemate conditions
+        # only kings
+        if w_knights == 0 and len(w_bishops) == 0 and b_knights == 0 and len(b_bishops) == 0:
+            return True
+        
+        # king(s) + (bishop or knight)
+        if (w_knights == 1 or len(w_bishops) == 1) and b_knights == 0 and len(b_bishops) == 0:
+            return True
+        if (b_knights == 1 or len(b_bishops) == 1) and w_knights == 0 and len(w_bishops) == 0:
+            return True
+        
+        # king(s) + same colored bishops
+        if len(w_bishops) == 1 and len(b_bishops) == 1:
+            if w_bishops[0] == b_bishops[0]: # check bishop colors
+                return True
+        
+        return False
 
 class Piece():
     def __init__(self, color, type):
