@@ -28,6 +28,9 @@ class GameState():
         self.castle_rights = CastleRights(True, True, True, True)
         self.castle_rights_log = [self.castle_rights.copy()]
 
+        self.en_passant_target = None # (r,c) of target square
+        self.en_passant_log = [self.en_passant_target]
+
     def make_move(self, move):  # no castle, promo, en pass
         self.board[move.start_row][move.start_col] = None
         self.board[move.end_row][move.end_col] = move.piece_moved
@@ -36,6 +39,18 @@ class GameState():
         
         move.piece_moved.has_moved = True
 
+        # en passant
+        if move.is_en_passant: # capture
+            self.board[move.start_row][move.end_col] = None
+
+        if move.piece_moved.type == 'p' and abs(move.start_row - move.end_row) == 2:
+            self.en_passant_target = ((move.start_row + move.end_row) // 2, move.start_col)
+        else:
+            self.en_passant_target = None
+
+        self.en_passant_log.append(self.en_passant_target)
+
+        # castling
         if move.is_castle_move:
             if move.end_col - move.start_col == 2:
                 rook = self.board[move.start_row][7]
@@ -56,13 +71,20 @@ class GameState():
             self.board[move.start_row][move.start_col] = move.piece_moved
             self.board[move.end_row][move.end_col] = move.piece_captured
             self.white_to_move = not self.white_to_move
-            # if move.piece_moved == "wK":
-            #     self.white_king_location = (move.start_row, move.start_col)
-            # elif move.piece_moved == "bK":  #burgerking
-            #     self.black_king_location = (move.start_row, move.start_col)
+
             if move.was_first_move:
                 move.piece_moved.has_moved = False
 
+            # en passant
+            self.en_passant_log.pop()
+            self.en_passant_target = self.en_passant_log[-1]
+
+            if move.is_en_passant:
+                self.board[move.end_row][move.end_col] = None
+                self.board[move.start_row][move.end_col] = move.piece_captured
+
+
+            # castling
             self.castle_rights_log.pop()
             self.castle_rights = self.castle_rights_log[-1].copy()
 
@@ -191,11 +213,17 @@ class GameState():
                         print(f"2-sq move for pawn at ({r},{c}) REJECTED. Piece ID: {id(piece)}, has_moved: {piece.has_moved}")
             # capture
             if c-1 >= 0: # left
+                target_sq = (r-1, c-1)
                 if self.board[r-1][c-1] is not None and self.board[r-1][c-1].color == 'b':
-                    moves.append(Move((r, c), (r-1, c-1), self.board))
+                    moves.append(Move((r, c), target_sq, self.board))
+                elif target_sq == self.en_passant_target: # in passing
+                    moves.append(Move((r,c), target_sq, self.board, is_en_passant=True))
             if c+1 <= 7: # right
+                target_sq = (r-1, c+1)
                 if self.board[r-1][c+1] is not None and self.board[r-1][c+1].color == 'b':
-                    moves.append(Move((r, c), (r-1, c+1), self.board))
+                    moves.append(Move((r, c), target_sq, self.board))
+                elif target_sq == self.en_passant_target: # in passing
+                    moves.append(Move((r,c), target_sq, self.board, is_en_passant=True))
 
         else: # black pawn (no to racism)
             if self.board[r+1][c] is None: # 1-square
@@ -204,11 +232,17 @@ class GameState():
                     moves.append(Move((r, c), (r+2, c), self.board))
             # capture
             if c-1 >= 0: # left
+                target_sq = (r+1, c-1)
                 if self.board[r+1][c-1] is not None and self.board[r+1][c-1].color == 'w':
-                    moves.append(Move((r, c), (r+1, c-1), self.board))
+                    moves.append(Move((r, c), target_sq, self.board))
+                elif target_sq == self.en_passant_target: # in passing
+                    moves.append(Move((r, c), target_sq, self.board, is_en_passant=True))
             if c+1 <= 7: # right
+                target_sq = (r+1, c+1)
                 if self.board[r+1][c+1] is not None and self.board[r+1][c+1].color == 'w':
-                    moves.append(Move((r, c), (r+1, c+1), self.board))
+                    moves.append(Move((r, c), target_sq, self.board))
+                elif target_sq == self.en_passant_target: # in passing
+                    moves.append(Move((r, c), target_sq, self.board, is_en_passant=True))
 
     def get_rook_moves(self, r, c, moves):
         directions = ((-1, 0), (0, -1), (1, 0), (0, 1)) #up,left,down,right
@@ -315,15 +349,22 @@ class CastleRights():
         return CastleRights(self.wks, self.wqs, self.bks, self.bqs)
 
 class Move():
-    def __init__(self, start_sq, end_sq, board, is_castle=False):
+    def __init__(self, start_sq, end_sq, board, is_castle=False, is_en_passant=False):
         self.start_row = start_sq[0]
         self.start_col = start_sq[1]
         self.end_row = end_sq[0]
         self.end_col = end_sq[1]
         self.piece_moved = board[self.start_row][self.start_col]
-        self.piece_captured = board[self.end_row][self.end_col]
+        # self.piece_captured = board[self.end_row][self.end_col]
 
-        self.was_first_move = not self.piece_moved.has_moved
+        self.is_en_passant = is_en_passant
+        if is_en_passant:
+            self.piece_captured = board[self.start_row][self.end_col]
+        else:
+            self.piece_captured = board[self.end_row][self.end_col]
+
+        #self.was_first_move = not self.piece_moved.has_moved
+        self.was_first_move = False # by default
         if self.piece_moved is not None: # NoneType protection
             self.was_first_move = not self.piece_moved.has_moved
 
