@@ -118,7 +118,7 @@ def main():
             valid_moves = gs.get_legal_moves()
             move_made = False
 
-        draw_game_state(screen, gs)
+        draw_game_state(screen, gs, valid_moves, sq_selected)
 
         if promotion_pending:
             promotion_clicks = draw_promotion_menu(screen, turn)
@@ -135,8 +135,9 @@ def main():
         clock.tick(MAX_FPS)
         p.display.flip()
 
-def draw_game_state(screen, gs):
+def draw_game_state(screen, gs, valid_moves, sq_selected):
     draw_board(screen)
+    highlight_squares(screen, gs, valid_moves, sq_selected)
     draw_pieces(screen, gs.board)
 
 def draw_board(screen):
@@ -170,6 +171,22 @@ def draw_promotion_menu(screen, turn):
     for i in range(4):
         clicks.append(p.Rect(menu_x + (i * SQ_SIZE), menu_y, SQ_SIZE, SQ_SIZE))
     return clicks
+
+def highlight_squares(screen, gs, valid_moves, sq_selected):
+    if sq_selected != ():
+        r, c = sq_selected
+
+        piece = gs.board[r][c]
+        if piece is not None and piece.color == ('w' if gs.white_to_move else 'b'):
+            s = p.Surface((SQ_SIZE, SQ_SIZE))
+            s.set_alpha(100)
+            s.fill(p.Color('blue'))
+            screen.blit(s, (c * SQ_SIZE, r * SQ_SIZE))
+
+            s.fill(p.Color('yellow'))
+            for move in valid_moves:
+                if move.start_row == r and move.start_col == c:
+                    screen.blit(s, (move.end_col * SQ_SIZE, move.end_row * SQ_SIZE))
 
 if __name__ == "__main__":
     main()
