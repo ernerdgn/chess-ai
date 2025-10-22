@@ -19,6 +19,15 @@ class GameState():
             [Piece("w", "p"), Piece("w", "p"), Piece("w", "p"), Piece("w", "p"), Piece("w", "p"), Piece("w", "p"), Piece("w", "p"), Piece("w", "p")],
             [Piece("w", "R"), Piece("w", "N"), Piece("w", "B"), Piece("w", "Q"), Piece("w", "K"), Piece("w", "B"), Piece("w", "N"), Piece("w", "R")]
         ]
+        # self.board = [
+        #     [Piece("b", "R"),None,None, None, Piece("b", "K"), None,None,Piece("b", "R")],
+        #     [None, None, None, None, None, None, None, None],            [None, None, None, None, None, None, None, None],
+        #     [None, None, None, None, None, None, None, None],
+        #     [None, None, None, None, None, None, None, None],
+        #     [None, None, None, None, None, None, None, None],
+        #     [None, None, None, None, None, None, None, None],
+        #     [Piece("w", "R"),None,None, None, Piece("w", "K"), None,None,Piece("w", "R")]
+        # ]
 
         self.white_to_move = True
         self.move_log = []
@@ -58,7 +67,7 @@ class GameState():
     def make_move(self, move):  # no castle, promo, en pass
         self.board[move.start_row][move.start_col] = None
 
-        if move.is_promotion:
+        if move.promotion_choice is not None:
             promo_piece = Piece(move.piece_moved.color, move.promotion_choice)
             self.board[move.end_row][move.end_col] = promo_piece
         else:
@@ -107,11 +116,11 @@ class GameState():
         self.position_history[new_hash] = self.position_history.get(new_hash, 0) + 1
 
     def undo_move(self):
-        current_hash = self.get_game_state_hash()
-        if current_hash in self.position_history:
-            self.position_history[current_hash] -= 1
-
         if len(self.move_log) != 0: # is there any moves
+            current_hash = self.get_game_state_hash()
+            if current_hash in self.position_history:
+                self.position_history[current_hash] -= 1
+            
             move = self.move_log.pop()
             self.board[move.start_row][move.start_col] = move.piece_moved
             self.board[move.end_row][move.end_col] = move.piece_captured
@@ -250,46 +259,71 @@ class GameState():
 
     def get_pawn_moves(self, r, c, moves):
         piece = self.board[r][c]
-
-        if self.white_to_move: # white
-            if self.board[r-1][c] is None: # 1-square
-                moves.append(Move((r, c), (r-1, c), self.board))
-                if r == 6 and self.board[r-2][c] is None: # 2-square
-                    if not piece.has_moved:
-                        moves.append(Move((r, c), (r-2, c), self.board))
-                    else:
-                        print(f"2-sq move for pawn at ({r},{c}) REJECTED. Piece ID: {id(piece)}, has_moved: {piece.has_moved}")
+        
+        if self.white_to_move: # white pawns
+            if self.board[r-1][c] is None:
+                if r-1 == 0: # promotion
+                    for p_type in ['Q', 'R', 'B', 'N']:
+                        moves.append(Move((r, c), (r-1, c), self.board, promotion_choice=p_type))
+                else: # 1-square
+                    moves.append(Move((r, c), (r-1, c), self.board))
+                if r == 6 and not piece.has_moved and self.board[r-2][c] is None: # 2-square
+                    moves.append(Move((r, c), (r-2, c), self.board))
+            
             # capture
-            if c-1 >= 0: # left
+            if c-1 >= 0: # capture left
                 target_sq = (r-1, c-1)
                 if self.board[r-1][c-1] is not None and self.board[r-1][c-1].color == 'b':
-                    moves.append(Move((r, c), target_sq, self.board))
-                elif target_sq == self.en_passant_target: # in passing
-                    moves.append(Move((r,c), target_sq, self.board, is_en_passant=True))
-            if c+1 <= 7: # right
+                    if r-1 == 0: # capture promotion
+                        for p_type in ['Q', 'R', 'B', 'N']:
+                            moves.append(Move((r, c), target_sq, self.board, promotion_choice=p_type))
+                    else: # regular capture
+                        moves.append(Move((r, c), target_sq, self.board))
+                elif target_sq == self.en_passant_target:
+                    moves.append(Move((r, c), target_sq, self.board, is_en_passant=True))
+            
+            if c+1 <= 7: # capture right
                 target_sq = (r-1, c+1)
                 if self.board[r-1][c+1] is not None and self.board[r-1][c+1].color == 'b':
-                    moves.append(Move((r, c), target_sq, self.board))
-                elif target_sq == self.en_passant_target: # in passing
-                    moves.append(Move((r,c), target_sq, self.board, is_en_passant=True))
+                    if r-1 == 0: # capture promotion
+                        for p_type in ['Q', 'R', 'B', 'N']:
+                            moves.append(Move((r, c), target_sq, self.board, promotion_choice=p_type))
+                    else: # regular capture
+                        moves.append(Move((r, c), target_sq, self.board))
+                elif target_sq == self.en_passant_target:
+                    moves.append(Move((r, c), target_sq, self.board, is_en_passant=True))
 
-        else: # black pawn (no to racism)
-            if self.board[r+1][c] is None: # 1-square
-                moves.append(Move((r, c), (r+1, c), self.board))
+        else: # black pawns (no to racism)
+            if self.board[r+1][c] is None:
+                if r+1 == 7: # promotion
+                    for p_type in ['Q', 'R', 'B', 'N']:
+                        moves.append(Move((r, c), (r+1, c), self.board, promotion_choice=p_type))
+                else: # 1-square
+                    moves.append(Move((r, c), (r+1, c), self.board))
                 if r == 1 and not piece.has_moved and self.board[r+2][c] is None: # 2-square
                     moves.append(Move((r, c), (r+2, c), self.board))
-            # capture
-            if c-1 >= 0: # left
+            
+            # captures
+            if c-1 >= 0: # capture left
                 target_sq = (r+1, c-1)
                 if self.board[r+1][c-1] is not None and self.board[r+1][c-1].color == 'w':
-                    moves.append(Move((r, c), target_sq, self.board))
-                elif target_sq == self.en_passant_target: # in passing
+                    if r+1 == 7: # capture promotion
+                        for p_type in ['Q', 'R', 'B', 'N']:
+                            moves.append(Move((r, c), target_sq, self.board, promotion_choice=p_type))
+                    else: # regular capture
+                        moves.append(Move((r, c), target_sq, self.board))
+                elif target_sq == self.en_passant_target:
                     moves.append(Move((r, c), target_sq, self.board, is_en_passant=True))
-            if c+1 <= 7: # right
+            
+            if c+1 <= 7: # capture right
                 target_sq = (r+1, c+1)
                 if self.board[r+1][c+1] is not None and self.board[r+1][c+1].color == 'w':
-                    moves.append(Move((r, c), target_sq, self.board))
-                elif target_sq == self.en_passant_target: # in passing
+                    if r+1 == 7: # capture promotion
+                        for p_type in ['Q', 'R', 'B', 'N']:
+                            moves.append(Move((r, c), target_sq, self.board, promotion_choice=p_type))
+                    else: # regular capture
+                        moves.append(Move((r, c), target_sq, self.board))
+                elif target_sq == self.en_passant_target:
                     moves.append(Move((r, c), target_sq, self.board, is_en_passant=True))
 
     def get_rook_moves(self, r, c, moves):
@@ -451,13 +485,12 @@ class CastleRights():
         return CastleRights(self.wks, self.wqs, self.bks, self.bqs)
 
 class Move():
-    def __init__(self, start_sq, end_sq, board, is_castle=False, is_en_passant=False):
+    def __init__(self, start_sq, end_sq, board, is_castle=False, is_en_passant=False, promotion_choice=None):
         self.start_row = start_sq[0]
         self.start_col = start_sq[1]
         self.end_row = end_sq[0]
         self.end_col = end_sq[1]
         self.piece_moved = board[self.start_row][self.start_col]
-        # self.piece_captured = board[self.end_row][self.end_col]
 
         self.is_en_passant = is_en_passant
         if is_en_passant:
@@ -465,7 +498,6 @@ class Move():
         else:
             self.piece_captured = board[self.end_row][self.end_col]
 
-        #self.was_first_move = not self.piece_moved.has_moved
         self.was_first_move = False # by default
         if self.piece_moved is not None: # NoneType protection
             self.was_first_move = not self.piece_moved.has_moved
@@ -473,17 +505,19 @@ class Move():
         self.is_castle_move = is_castle
 
         # promotion
-        self.is_promotion = False
-        if self.piece_moved is not None and self.piece_moved.type == 'p':
-            if (self.piece_moved.color == 'w' and self.end_row == 0) or \
-                (self.piece_moved.color == 'b' and self.end_row == 7):
-                self.is_promotion = True
-        self.promotion_choice = None
+        self.promotion_choice = promotion_choice
+        # self.is_promotion = False
+        # if self.piece_moved is not None and self.piece_moved.type == 'p':
+        #     if (self.piece_moved.color == 'w' and self.end_row == 0) or \
+        #         (self.piece_moved.color == 'b' and self.end_row == 7):
+        #         self.is_promotion = True
+        # self.promotion_choice = None
 
     def __eq__(self, other):
         if isinstance(other, Move):
             return self.start_row == other.start_row and self.start_col == other.start_col and \
-                    self.end_row == other.end_row and self.end_col == other.end_col
+                    self.end_row == other.end_row and self.end_col == other.end_col and \
+                    self.promotion_choice == other.promotion_choice
         return False
     
     ranks_to_rows = {"1": 7, "2": 6, "3": 5, "4": 4,
