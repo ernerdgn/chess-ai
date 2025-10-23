@@ -176,7 +176,8 @@ def main():
         
         if app_state == "playing":
             if not game_over and not promotion_pending and not player_two_is_human and not gs.white_to_move:
-                ai_move = ai.find_random_move(gs)
+                #ai_move = ai.find_random_move(gs)
+                ai_move = ai.find_best_move(gs)
                 if ai_move:
                     gs.make_move(ai_move)
                     print("ai move: " + ai_move.get_chess_notation())

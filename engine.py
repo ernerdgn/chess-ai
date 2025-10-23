@@ -528,7 +528,7 @@ class Move():
     cols_to_files = {v: k for k, v in files_to_cols.items()}
 
     def get_chess_notation(self):
-        return self.get_rank_file(self.start_row, self.start_col) + self.get_rank_file(self.end_row, self.end_col)
+        return self.piece_moved.type + self.get_rank_file(self.start_row, self.start_col) + self.get_rank_file(self.end_row, self.end_col)
 
     def get_rank_file(self, r, c):
         return self.cols_to_files[c] + self.rows_to_ranks[r]
