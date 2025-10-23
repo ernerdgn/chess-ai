@@ -1,5 +1,6 @@
 import pygame as p
 import engine
+import ai
 
 #consts
 WIDTH = 512
@@ -100,6 +101,7 @@ def main():
                             sq_selected = ()
                             promotion_clicks = []
                             break
+
                 elif e.type == p.MOUSEBUTTONDOWN:
                     if not game_over:
                         location = p.mouse.get_pos()  #(x,y)
@@ -173,6 +175,13 @@ def main():
 
         
         if app_state == "playing":
+            if not game_over and not promotion_pending and not player_two_is_human and not gs.white_to_move:
+                ai_move = ai.find_random_move(gs)
+                if ai_move:
+                    gs.make_move(ai_move)
+                    print("ai move: " + ai_move.get_chess_notation())
+                    move_made = True
+
             if move_made:
                 valid_moves = gs.get_legal_moves()
                 move_made = False
