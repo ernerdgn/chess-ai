@@ -70,7 +70,7 @@ def minimax_pruning(game_state, depth, alpha, beta, is_maximizing_player):
             score = minimax_pruning(game_state, depth - 1, alpha, beta, False)
             game_state.undo_move()
 
-            if score > best_score:
+            if score >= best_score:
                 best_score = score
                 if depth == SEARCH_DEPTH:
                     best_move_found = move
@@ -87,7 +87,7 @@ def minimax_pruning(game_state, depth, alpha, beta, is_maximizing_player):
             score = minimax_pruning(game_state, depth - 1, alpha, beta, True)
             game_state.undo_move()
             
-            if score < best_score:
+            if score <= best_score:
                 best_score = score
                 if depth == SEARCH_DEPTH:
                     best_move_found = move
