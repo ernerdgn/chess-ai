@@ -83,3 +83,12 @@ piece_position_scores = {
     "Q": queen_table,
     "K": king_table
 }
+
+piece_map = {
+    "p": 0,
+    "N": 1,
+    "B": 2,
+    "R": 3,
+    "Q": 4,
+    "K": 5
+}

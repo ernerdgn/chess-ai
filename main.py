@@ -21,6 +21,9 @@ def main():
     clock = p.time.Clock()
     screen.fill(p.Color("white"))
 
+    FONT = p.font.SysFont("Arial", 32, True, False)
+    SMALL_FONT = p.font.SysFont("Arial", 20, False, False)
+
     gs = engine.GameState()
     valid_moves = gs.get_legal_moves()
     move_made = False
@@ -37,7 +40,8 @@ def main():
     promotion_clicks = []
 
     app_state = "menu"
-    player_two_is_human = True # by default, can be changed from menu
+    #player_two_is_human = True # by default, can be changed from menu
+    opponent_type = "human"
     menu_buttons = ()
     game_over_button = ()
     game_over_text = ""
@@ -55,10 +59,15 @@ def main():
                 if e.type == p.MOUSEBUTTONDOWN:
                     location = p.mouse.get_pos()
                     if menu_buttons[0].collidepoint(location):
-                        player_two_is_human = True
+                        opponent_type = "human"
                         app_state = "playing"
                     elif menu_buttons[1].collidepoint(location):
-                        player_two_is_human = False
+                        #print("ai classic selected")
+                        opponent_type = "ai_classic"
+                        app_state = "playing"
+                    elif menu_buttons[2].collidepoint(location):
+                        #print("ai ml selected")
+                        opponent_type = "ai_ml"
                         app_state = "playing"
             
             elif app_state == "game_over":
@@ -175,9 +184,9 @@ def main():
 
         
         if app_state == "playing":
-            if not game_over and not promotion_pending and not player_two_is_human and not gs.white_to_move:
+            if not game_over and not promotion_pending and opponent_type != "human" and not gs.white_to_move:
                 #ai_move = ai.find_random_move(gs)
-                ai_move = ai.find_best_move(gs)
+                ai_move = ai.find_best_move(gs, opponent_type)
                 if ai_move:
                     gs.make_move(ai_move)
                     print("ai move: " + ai_move.get_chess_notation())
@@ -210,12 +219,13 @@ def main():
                 if game_over:
                     print(game_over_text) # console log
                     app_state = "game_over"
-            
+        mouse_pos = p.mouse.get_pos()
+
         if app_state == "menu":
-            menu_buttons = draw_menu(screen)
+            menu_buttons = draw_menu(screen, mouse_pos, FONT, SMALL_FONT)
         elif app_state == "game_over":
             #print("game over text: ", game_over_text)
-            game_over_button = draw_game_over(screen, game_over_text)
+            game_over_button = draw_game_over(screen, game_over_text, FONT)
         elif app_state == "playing":
             draw_game_state(screen, gs,valid_moves, sq_selected)
             if promotion_pending:
@@ -290,38 +300,85 @@ def draw_check_highlight(screen, gs):
             s.fill(p.Color('red'))
             screen.blit(s, (c * SQ_SIZE, r * SQ_SIZE))
 
-def draw_menu(screen):
+def draw_menu(screen, mouse_pos, font, small_font):
     screen.fill(p.Color("black"))
     font = p.font.SysFont("Arial", 32, bold=True, italic=False)
 
     # tit(s)le
     text = font.render("chASS", 1, p.Color("white"))
-    text_react = text.get_rect(center=(WIDTH // 2, HEIGHT // 3))
+    text_react = text.get_rect(center=(WIDTH // 2, HEIGHT // 12))
     screen.blit(text, text_react)
 
-    # play w/human
-    pvp_rect = p.Rect((WIDTH // 4), (HEIGHT // 2), (WIDTH // 2), 50)
-    p.draw.rect(screen, p.Color("grey"), pvp_rect)
-    text = font.render("PvP", 1, p.Color("black"))
-    text_rect = text.get_rect(center=pvp_rect.center)
-    screen.blit(text, text_rect)
+    buttons = {
+        "pvp": {
+            "rect": p.Rect((WIDTH // 4), (HEIGHT // 2) - 60, (WIDTH // 2), 50),
+            "text": "PvP",
+            "desc": "Play a two-player (or solo) game locally."
+        },
+        "ai_classic": {
+            "rect": p.Rect((WIDTH // 4), (HEIGHT // 2) + 10, (WIDTH // 2), 50),
+            "text": "PvAI",
+            "desc": "Play against the fast, logic-based AI."
+        },
+        "ai_ml": {
+            "rect": p.Rect((WIDTH // 4), (HEIGHT // 2) + 80, (WIDTH // 2), 50),
+            "text": "PvAI (ML)",
+            "desc": "Play against the experimental machine learning AI."
+        }
+    }
 
-    # play /w ai
-    pvai_rect = p.Rect((WIDTH // 4), (HEIGHT // 2) + 70, (WIDTH // 2), 50)
-    p.draw.rect(screen, p.Color("gray"), pvai_rect)
-    text = font.render("PvAI", 1, p.Color("black"))
-    text_rect = text.get_rect(center=pvai_rect.center)
-    screen.blit(text, text_rect)
+    color_default = p.Color("gray")
+    color_hover = p.Color("lightyellow")
+    explanation_text = ""
+    button_rects_to_return = []
 
-    return pvp_rect, pvai_rect
+    for key, button in buttons.items():
+        color = color_default
+        if button["rect"].collidepoint(mouse_pos):
+            color = color_hover
+            explanation_text = button["desc"]
+        
+        p.draw.rect(screen, color, button["rect"])
+        text_obj = font.render(button["text"], 1, p.Color("black"))
 
-def draw_game_over(screen, text):
+        screen.blit(text_obj, text_obj.get_rect(center=button["rect"].center))
+        button_rects_to_return.append(button["rect"])
+    
+    if explanation_text:
+        exp_text_obj = small_font.render(explanation_text, 1, p.Color("white"))
+        exp_text_rect = exp_text_obj.get_rect(center=(WIDTH // 2, (HEIGHT // 2) - 130))
+        screen.blit(exp_text_obj, exp_text_rect)
+    
+    return tuple(button_rects_to_return)
+
+    # # play w/human
+    # pvp_rect = p.Rect((WIDTH // 4), (HEIGHT // 2) - 60, (WIDTH // 2), 50)
+    # p.draw.rect(screen, p.Color("grey"), pvp_rect)
+    # text = font.render("PvP", 1, p.Color("black"))
+    # text_rect = text.get_rect(center=pvp_rect.center)
+    # screen.blit(text, text_rect)
+
+    # # play /w ai (classic)
+    # pvai_rect = p.Rect((WIDTH // 4), (HEIGHT // 2) + 10, (WIDTH // 2), 50)
+    # p.draw.rect(screen, p.Color("gray"), pvai_rect)
+    # text = font.render("PvAI", 1, p.Color("black"))
+    # text_rect = text.get_rect(center=pvai_rect.center)
+    # screen.blit(text, text_rect)
+
+    # # play w/ai(ML)
+    # pvml_rect = p.Rect((WIDTH // 4), (HEIGHT // 2) + 80, (WIDTH // 2), 50)
+    # p.draw.rect(screen, p.Color("gray"), pvml_rect)
+    # text = font.render("PvAI (ML)", 1, p.Color("black"))
+    # text_rect = text.get_rect(center=pvml_rect.center)
+    # screen.blit(text, text_rect)
+
+    # return pvp_rect, pvai_rect, pvml_rect
+
+def draw_game_over(screen, text, font):
     menu_rect = p.Rect(0, 0, 400, 200)
     menu_rect.center = (WIDTH // 2, HEIGHT // 2)
     p.draw.rect(screen, p.Color("black"), menu_rect)
     p.draw.rect(screen, p.Color("white"), menu_rect.inflate(4, 4), 2)
-
-    font = p.font.SysFont("Arial", 32, True, False)
 
     # gameOver
     text_obj = font.render(text, 1, p.Color("white"))
