@@ -3,7 +3,8 @@ import engine
 import ai
 
 #consts
-WIDTH = 512
+SIDE_PANEL_WIDTH = 256
+WIDTH = 512 + SIDE_PANEL_WIDTH
 HEIGHT = 512
 DIMENSION = 8
 MAX_FPS = 15
@@ -45,6 +46,7 @@ def main():
     menu_buttons = ()
     game_over_button = ()
     game_over_text = ""
+    scroll_offset_y = 0
 
 
     while running:
@@ -56,7 +58,7 @@ def main():
                 running = False
 
             if app_state == "menu":
-                if e.type == p.MOUSEBUTTONDOWN:
+                if e.type == p.MOUSEBUTTONDOWN and e.button == 1:
                     location = p.mouse.get_pos()
                     if menu_buttons[0].collidepoint(location):
                         opponent_type = "human"
@@ -71,7 +73,7 @@ def main():
                         app_state = "playing"
             
             elif app_state == "game_over":
-                if e.type == p.MOUSEBUTTONDOWN:
+                if e.type == p.MOUSEBUTTONDOWN and e.button == 1:
                     location = p.mouse.get_pos()
                     if game_over_button.collidepoint(location):
                         gs = engine.GameState()
@@ -84,7 +86,10 @@ def main():
                         app_state = "menu"
             
             elif app_state == "playing":
-                if e.type == p.MOUSEBUTTONDOWN and promotion_pending:
+                if e.type == p.MOUSEWHEEL:
+                    scroll_offset_y -= e.y * 30 # e.y-> +1 for down, -1 for up
+
+                elif e.type == p.MOUSEBUTTONDOWN and e.button and promotion_pending:
                     location = p.mouse.get_pos()
                     for i, rect in enumerate(promotion_clicks):
                         if rect.collidepoint(location):
@@ -111,66 +116,71 @@ def main():
                             promotion_clicks = []
                             break
 
-                elif e.type == p.MOUSEBUTTONDOWN:
+                elif e.type == p.MOUSEBUTTONDOWN and e.button == 1:
                     if not game_over:
                         location = p.mouse.get_pos()  #(x,y)
                         col = location[0] // SQ_SIZE
                         row = location[1] // SQ_SIZE
-                        if sq_selected == (row, col):
+                        # check if the click inside the board
+                        if 0 <= row < DIMENSION and 0 <= col < DIMENSION:
+                            if sq_selected == (row, col):
+                                sq_selected = ()
+                                player_clicks = []
+                            else:
+                                sq_selected = (row, col)
+                                player_clicks.append(sq_selected)
+
+                            if len(player_clicks) == 1:
+                                if gs.board[row][col] is None:  #if clicked to an empty square
+                                    sq_selected = ()
+                                    player_clicks = []
+
+                            if len(player_clicks) == 2:
+                                start_sq = player_clicks[0]
+                                end_sq = player_clicks[1]
+                                move = engine.Move(start_sq, end_sq, gs.board)
+                                
+                                
+                                start_piece = gs.board[start_sq[0]][start_sq[1]]
+
+                                is_promotion_click = False
+                                if start_piece is not None and start_piece.type == 'p':
+                                    if (start_piece.color == 'w' and end_sq[0] == 0) or \
+                                        (start_piece.color == 'b' and end_sq[0] == 7):
+                                        is_promotion_click = True
+                                
+                                if is_promotion_click:
+                                    for vm in valid_moves:
+                                        if vm.start_row == start_sq[0] and vm.start_col == start_sq[1] and \
+                                            vm.end_row == end_sq[0] and vm.end_col == end_sq[1] and \
+                                            vm.promotion_choice is not None:
+                                            promotion_pending = True
+                                            pending_move = move
+                                            break
+                                    sq_selected = ()
+                                    player_clicks = []
+
+                                else:
+                                    for i in range(len(valid_moves)):
+                                        if move == valid_moves[i]: # only non-promo moves
+                                            gs.make_move(valid_moves[i])
+                                            print(move.get_chess_notation())
+                                            move_made = True
+                                            sq_selected = ()
+                                            player_clicks = []
+                                            break
+                                    
+                                    if not move_made and not promotion_pending:
+                                        end_piece = gs.board[player_clicks[1][0]][player_clicks[1][1]]
+                                        if end_piece is not None and end_piece.color == start_piece.color:
+                                            sq_selected = player_clicks[1]
+                                            player_clicks = [sq_selected]
+                                        else:
+                                            sq_selected = ()
+                                            player_clicks = []
+                        else: # click outside the board
                             sq_selected = ()
                             player_clicks = []
-                        else:
-                            sq_selected = (row, col)
-                            player_clicks.append(sq_selected)
-
-                        if len(player_clicks) == 1:
-                            if gs.board[row][col] is None:  #if clicked to an empty square
-                                sq_selected = ()
-                                player_clicks = []
-
-                        if len(player_clicks) == 2:
-                            start_sq = player_clicks[0]
-                            end_sq = player_clicks[1]
-                            move = engine.Move(start_sq, end_sq, gs.board)
-                            
-                            
-                            start_piece = gs.board[start_sq[0]][start_sq[1]]
-
-                            is_promotion_click = False
-                            if start_piece is not None and start_piece.type == 'p':
-                                if (start_piece.color == 'w' and end_sq[0] == 0) or \
-                                    (start_piece.color == 'b' and end_sq[0] == 7):
-                                    is_promotion_click = True
-                            
-                            if is_promotion_click:
-                                for vm in valid_moves:
-                                    if vm.start_row == start_sq[0] and vm.start_col == start_sq[1] and \
-                                        vm.end_row == end_sq[0] and vm.end_col == end_sq[1] and \
-                                        vm.promotion_choice is not None:
-                                        promotion_pending = True
-                                        pending_move = move
-                                        break
-                                sq_selected = ()
-                                player_clicks = []
-
-                            else:
-                                for i in range(len(valid_moves)):
-                                    if move == valid_moves[i]: # only non-promo moves
-                                        gs.make_move(valid_moves[i])
-                                        print(move.get_chess_notation())
-                                        move_made = True
-                                        sq_selected = ()
-                                        player_clicks = []
-                                        break
-                                
-                                if not move_made and not promotion_pending:
-                                    end_piece = gs.board[player_clicks[1][0]][player_clicks[1][1]]
-                                    if end_piece is not None and end_piece.color == start_piece.color:
-                                        sq_selected = player_clicks[1]
-                                        player_clicks = [sq_selected]
-                                    else:
-                                        sq_selected = ()
-                                        player_clicks = []
                 #
                 elif e.type == p.KEYDOWN:
                     if e.key == p.K_u:
@@ -228,6 +238,7 @@ def main():
             game_over_button = draw_game_over(screen, game_over_text, FONT)
         elif app_state == "playing":
             draw_game_state(screen, gs,valid_moves, sq_selected)
+            draw_side_panel(screen, gs, SMALL_FONT, scroll_offset_y)
             if promotion_pending:
                 promotion_clicks = draw_promotion_menu(screen, turn)
             
@@ -254,6 +265,75 @@ def draw_pieces(screen, board):
             if piece is not None:
                 image_name = piece.color + piece.type
                 screen.blit(IMAGES[image_name], p.Rect(c*SQ_SIZE, r*SQ_SIZE, SQ_SIZE, SQ_SIZE))
+
+def draw_side_panel(screen, gs, font, scroll_y):
+    panel_rect = p.Rect(512, 0, 256, HEIGHT) # x, y, width, height
+    p.draw.rect(screen, p.Color("black"), panel_rect) # Draw black background
+
+    # == move log
+    padding = 10
+
+    # log area
+    log_area_width = 250
+    log_area_height = 172
+    log_area_x = panel_rect.x + (panel_rect.width - log_area_width) // 2
+    log_area_y = panel_rect.y + (panel_rect.height - log_area_height) // 2
+    log_area_rect = p.Rect(log_area_x, log_area_y, log_area_width, log_area_height)
+
+    #p.draw.rect(screen, p.Color("white"), log_area_rect, 1) # border move log (doesnt work?)
+
+    # text
+    text_color = p.Color("white")
+    line_spacing = 5
+    total_text_height = 0
+
+    move_log = gs.move_log
+    lines_to_render = []
+    line_text = ""
+
+    for i, move in enumerate(move_log):
+        move_number = (i // 2) + 1 # 1, 1, 2, 2, ...
+        
+        if i % 2 == 0:
+            line_text = f"{move_number}. {move.get_chess_notation()}"
+            if i == len(move_log) - 1:
+                 lines_to_render.append(line_text)
+                 text_object = font.render(line_text, True, text_color)
+                 total_text_height += text_object.get_height() + line_spacing
+        else:
+            line_text += f" {move.get_chess_notation()}"
+            lines_to_render.append(line_text)
+            text_object = font.render(line_text, True, text_color)
+            total_text_height += text_object.get_height() + line_spacing
+            line_text = ""
+    
+    if total_text_height > 0:
+        total_text_height -= line_spacing
+
+    # surface
+    text_surface_height = max(total_text_height, log_area_height)
+    text_surface = p.Surface((log_area_width, text_surface_height))
+    text_surface.fill(p.Color("darkgrey"))
+
+    # render lines
+    current_y_on_surface = 0
+    for line in lines_to_render:
+        text_object = font.render(line, True, text_color)
+        text_rect = text_object.get_rect(centerx=log_area_width // 2, top=current_y_on_surface)
+        text_surface.blit(text_object, text_rect)
+        current_y_on_surface += text_object.get_height() + line_spacing
+
+    # scroll logic
+    max_scroll = max(0, total_text_height - log_area_height)
+    scroll_y = max(0, min(scroll_y, max_scroll))
+
+    # draw visible part
+    source_rect = p.Rect(0, scroll_y, log_area_width, log_area_height)
+    destination_rect = log_area_rect # where to draw on main screen
+    
+    screen.blit(text_surface, destination_rect, source_rect)
+
+    return scroll_y
 
 def draw_promotion_menu(screen, turn):
     menu_x = (WIDTH // 2) - (2 * SQ_SIZE)
