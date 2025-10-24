@@ -51,7 +51,7 @@ def main():
     game_over_text = ""
     scroll_offset_y = 0
 
-    min_insput_strt = "5" # default time 5+3
+    min_input_str = "5" # default time 5+3
     inc_input_str = "3"
     active_input = None
     input_boxes = {}
@@ -59,6 +59,8 @@ def main():
     last_update_time = turn_start_time # for smoother display
     white_display_time = gs.white_time_left
     black_display_time = gs.black_time_left
+
+    return_button = None
 
     while running:
         turn = 'w' if gs.white_to_move else 'b'
@@ -71,30 +73,101 @@ def main():
             if app_state == "menu":
                 if e.type == p.MOUSEBUTTONDOWN and e.button == 1:
                     location = p.mouse.get_pos()
+
+                    play_button_clicked = False
+                    new_opponent_type = None
+
                     if menu_buttons[0].collidepoint(location):
-                        opponent_type = "human"
-                        app_state = "playing"
-                        turn_start_time = p.time.get_ticks() # reset clock
-                        last_update_time = turn_start_time
-                        white_display_time = gs.white_time_left
-                        black_display_time = gs.black_time_left
+                        new_opponent_type = "human"
+                        play_button_clicked = True
+                        # app_state = "playing"
+                        # turn_start_time = p.time.get_ticks() # reset clock
+                        # last_update_time = turn_start_time
+                        # white_display_time = gs.white_time_left
+                        # black_display_time = gs.black_time_left
                     elif menu_buttons[1].collidepoint(location):
                         #print("ai classic selected")
-                        opponent_type = "ai_classic"
-                        app_state = "playing"
-                        turn_start_time = p.time.get_ticks() # reset clock
-                        last_update_time = turn_start_time
-                        white_display_time = gs.white_time_left
-                        black_display_time = gs.black_time_left
+                        new_opponent_type = "ai_classic"
+                        play_button_clicked = True
+                        # app_state = "playing"
+                        # turn_start_time = p.time.get_ticks() # reset clock
+                        # last_update_time = turn_start_time
+                        # white_display_time = gs.white_time_left
+                        # black_display_time = gs.black_time_left
                     elif menu_buttons[2].collidepoint(location):
                         #print("ai ml selected")
-                        opponent_type = "ai_ml"
+                        new_opponent_type = "ai_ml"
+                        play_button_clicked = True
+                        # app_state = "playing"
+                        # turn_start_time = p.time.get_ticks() # reset clock
+                        # last_update_time = turn_start_time
+                        # white_display_time = gs.white_time_left
+                        # black_display_time = gs.black_time_left
+
+                    if play_button_clicked:
+                        opponent_type = new_opponent_type
                         app_state = "playing"
-                        turn_start_time = p.time.get_ticks() # reset clock
+
+                        try: # parsing time inputs, use defaults on error
+                            start_mins = float(min_input_str) if min_input_str else 5.0
+                        except ValueError:
+                            start_mins = 5.0
+                            print("ERROR on time parsing for minutes, using default (5)")
+                        try: # parsing time inputs, use defaults on error
+                            increment_secs = float(inc_input_str) if inc_input_str else 3.0
+                        except ValueError:
+                            increment_secs = 3.0
+                            print("ERROR on time parsing for increment, using default (3)")
+
+                        gs = engine.GameState(initial_time_mins=start_mins, increment_secs=increment_secs)
+                        valid_moves = gs.get_legal_moves()
+
+                        sq_selected = ()
+                        player_clicks = []
+                        game_over = False
+                        promotion_pending = False
+                        pending_move = None
+                        scroll_offset_y = 0
+
+                        turn_start_time = p.time.get_ticks()
                         last_update_time = turn_start_time
                         white_display_time = gs.white_time_left
                         black_display_time = gs.black_time_left
-            
+                    
+                    else:
+                        clicked_on_input = False
+                        if input_boxes:
+                            for box_key, box_rect in input_boxes.items():
+                                if box_rect.collidepoint(location):
+                                    active_input = box_key
+                                    clicked_on_input = True
+                                    break
+                        if not clicked_on_input:
+                            active_input = None
+
+                    # clicked_on_input = False
+                    # for box_key, box_rect in input_boxes.items():
+                    #     if box_rect.collidepoint(location):
+                    #         active_input = box_key # active clicked box
+                    #         clicked_on_input = True
+                    #         break
+                    # if not clicked_on_input:
+                    #     active_input = None
+                
+                elif e.type == p.KEYDOWN:
+                    if active_input == "min":
+                        if e.key == p.K_BACKSPACE:
+                            min_input_str = min_input_str[:-1] # remove last char
+                        elif e.unicode.isdigit(): # check if input is number
+                            if len(min_input_str) < 3: # max 999 minutes
+                                min_input_str += e.unicode
+                    elif active_input == "inc":
+                        if e.key == p.K_BACKSPACE:
+                            inc_input_str = inc_input_str[:-1] # remove last char
+                        elif e.unicode.isdigit(): # check if input is number
+                            if len(inc_input_str) < 3: # max 999 seconds
+                                inc_input_str += e.unicode
+                            
             elif app_state == "game_over":
                 if e.type == p.MOUSEBUTTONDOWN and e.button == 1:
                     location = p.mouse.get_pos()
@@ -111,8 +184,9 @@ def main():
             elif app_state == "playing":
                 if e.type == p.MOUSEWHEEL:
                     scroll_offset_y -= e.y * 30 # e.y-> +1 for down, -1 for up
-
-                elif e.type == p.MOUSEBUTTONDOWN and e.button and promotion_pending:
+                elif e.type == p.MOUSEBUTTONDOWN and e.button == 1 and promotion_pending:
+                    if e.button == 4: scroll_offset_y -= 30 # e.y-> +1 for down, -1 for up
+                    elif e.button == 5: scroll_offset_y += 30
                     location = p.mouse.get_pos()
                     for i, rect in enumerate(promotion_clicks):
                         if rect.collidepoint(location):
@@ -142,91 +216,100 @@ def main():
                 elif e.type == p.MOUSEBUTTONDOWN and e.button == 1:
                     if not game_over:
                         location = p.mouse.get_pos()  #(x,y)
-                        col = location[0] // SQ_SIZE
-                        row = location[1] // SQ_SIZE
-                        # check if the click inside the board
-                        if 0 <= row < DIMENSION and 0 <= col < DIMENSION:
-                            if sq_selected == (row, col):
-                                sq_selected = ()
-                                player_clicks = []
-                            else:
-                                sq_selected = (row, col)
-                                player_clicks.append(sq_selected)
 
-                            if len(player_clicks) == 1:
-                                if gs.board[row][col] is None:  #if clicked to an empty square
-                                    sq_selected = ()
-                                    player_clicks = []
-
-                            if len(player_clicks) == 2:
-                                start_sq = player_clicks[0]
-                                end_sq = player_clicks[1]
-                                move = engine.Move(start_sq, end_sq, gs.board)
-                                
-                                
-                                start_piece = gs.board[start_sq[0]][start_sq[1]]
-
-                                is_promotion_click = False
-                                if start_piece is not None and start_piece.type == 'p':
-                                    if (start_piece.color == 'w' and end_sq[0] == 0) or \
-                                        (start_piece.color == 'b' and end_sq[0] == 7):
-                                        is_promotion_click = True
-                                
-                                if is_promotion_click:
-                                    for vm in valid_moves:
-                                        if vm.start_row == start_sq[0] and vm.start_col == start_sq[1] and \
-                                            vm.end_row == end_sq[0] and vm.end_col == end_sq[1] and \
-                                            vm.promotion_choice is not None:
-                                            promotion_pending = True
-                                            pending_move = move
-                                            break
-                                    sq_selected = ()
-                                    player_clicks = []
-
-                                else:
-                                    for i in range(len(valid_moves)):
-                                        if move == valid_moves[i]: # only non-promo moves
-                                            gs.make_move(valid_moves[i])
-
-                                            final_elapsed_sec = (p.time.get_ticks() - turn_start_time) / 1000.0
-
-                                            if not gs.white_to_move:
-                                                pre_increment_time = gs.white_time_log[-2]
-                                                gs.white_time_left = pre_increment_time - final_elapsed_sec + gs.increment
-                                                gs.white_time_log[-1] = gs.white_time_left
-                                            else:
-                                                pre_increment_time = gs.black_time_log[-2]
-                                                gs.black_time_left = pre_increment_time - final_elapsed_sec + gs.increment
-                                                gs.black_time_log[-1] = gs.black_time_left
-
-                                            gs.white_time_left = max(0, gs.white_time_left)
-                                            gs.black_time_left = max(0, gs.black_time_left)
-
-                                            # sync display times
-                                            white_display_time = gs.white_time_left
-                                            black_display_time = gs.black_time_left
-
-                                            # reset timer for the next turn
-                                            turn_start_time = p.time.get_ticks()
-                                            last_update_time = turn_start_time
-
-                                            print(move.get_chess_notation())
-                                            move_made = True
-                                            sq_selected = ()
-                                            player_clicks = []
-                                            break
-                                    
-                                    if not move_made and not promotion_pending:
-                                        end_piece = gs.board[player_clicks[1][0]][player_clicks[1][1]]
-                                        if end_piece is not None and end_piece.color == start_piece.color:
-                                            sq_selected = player_clicks[1]
-                                            player_clicks = [sq_selected]
-                                        else:
-                                            sq_selected = ()
-                                            player_clicks = []
-                        else: # click outside the board
+                        if return_button and return_button.collidepoint(location):
+                            app_state = "menu"
                             sq_selected = ()
                             player_clicks = []
+                            promotion_pending = False
+                            pending_move = None
+                            active_input = None
+                        else:
+                            col = location[0] // SQ_SIZE
+                            row = location[1] // SQ_SIZE
+                            # check if the click inside the board
+                            if 0 <= row < DIMENSION and 0 <= col < DIMENSION:
+                                if sq_selected == (row, col):
+                                    sq_selected = ()
+                                    player_clicks = []
+                                else:
+                                    sq_selected = (row, col)
+                                    player_clicks.append(sq_selected)
+
+                                if len(player_clicks) == 1:
+                                    if gs.board[row][col] is None:  #if clicked to an empty square
+                                        sq_selected = ()
+                                        player_clicks = []
+
+                                if len(player_clicks) == 2:
+                                    start_sq = player_clicks[0]
+                                    end_sq = player_clicks[1]
+                                    move = engine.Move(start_sq, end_sq, gs.board)
+                                    
+                                    
+                                    start_piece = gs.board[start_sq[0]][start_sq[1]]
+
+                                    is_promotion_click = False
+                                    if start_piece is not None and start_piece.type == 'p':
+                                        if (start_piece.color == 'w' and end_sq[0] == 0) or \
+                                            (start_piece.color == 'b' and end_sq[0] == 7):
+                                            is_promotion_click = True
+                                    
+                                    if is_promotion_click:
+                                        for vm in valid_moves:
+                                            if vm.start_row == start_sq[0] and vm.start_col == start_sq[1] and \
+                                                vm.end_row == end_sq[0] and vm.end_col == end_sq[1] and \
+                                                vm.promotion_choice is not None:
+                                                promotion_pending = True
+                                                pending_move = move
+                                                break
+                                        sq_selected = ()
+                                        player_clicks = []
+
+                                    else:
+                                        for i in range(len(valid_moves)):
+                                            if move == valid_moves[i]: # only non-promo moves
+                                                gs.make_move(valid_moves[i])
+
+                                                final_elapsed_sec = (p.time.get_ticks() - turn_start_time) / 1000.0
+
+                                                if not gs.white_to_move:
+                                                    pre_increment_time = gs.white_time_log[-2]
+                                                    gs.white_time_left = pre_increment_time - final_elapsed_sec + gs.increment
+                                                    gs.white_time_log[-1] = gs.white_time_left
+                                                else:
+                                                    pre_increment_time = gs.black_time_log[-2]
+                                                    gs.black_time_left = pre_increment_time - final_elapsed_sec + gs.increment
+                                                    gs.black_time_log[-1] = gs.black_time_left
+
+                                                gs.white_time_left = max(0, gs.white_time_left)
+                                                gs.black_time_left = max(0, gs.black_time_left)
+
+                                                # sync display times
+                                                white_display_time = gs.white_time_left
+                                                black_display_time = gs.black_time_left
+
+                                                # reset timer for the next turn
+                                                turn_start_time = p.time.get_ticks()
+                                                last_update_time = turn_start_time
+
+                                                print(move.get_chess_notation())
+                                                move_made = True
+                                                sq_selected = ()
+                                                player_clicks = []
+                                                break
+                                        
+                                        if not move_made and not promotion_pending:
+                                            end_piece = gs.board[player_clicks[1][0]][player_clicks[1][1]]
+                                            if end_piece is not None and end_piece.color == start_piece.color:
+                                                sq_selected = player_clicks[1]
+                                                player_clicks = [sq_selected]
+                                            else:
+                                                sq_selected = ()
+                                                player_clicks = []
+                            else: # click outside the board
+                                sq_selected = ()
+                                player_clicks = []
                 #
                 elif e.type == p.KEYDOWN:
                     if e.key == p.K_u:
@@ -276,6 +359,7 @@ def main():
             if not game_over and not promotion_pending and opponent_type != "human" and not gs.white_to_move:
                 ai_move = ai.find_best_move(gs, opponent_type)
                 if ai_move:
+                    #p.time.delay(100) # wait for one sec (ARDIL)
                     gs.make_move(ai_move)
 
                     final_elapsed_sec = (p.time.get_ticks() - turn_start_time) / 1000.0
@@ -326,13 +410,16 @@ def main():
         mouse_pos = p.mouse.get_pos()
 
         if app_state == "menu":
-            menu_buttons = draw_menu(screen, mouse_pos, FONT, SMALL_FONT)
+            menu_buttons, input_boxes = draw_menu(screen, mouse_pos, FONT, SMALL_FONT,
+                                                  min_input_str, inc_input_str, active_box=active_input)
+            return_button = None
         elif app_state == "game_over":
             #print("game over text: ", game_over_text)
             game_over_button = draw_game_over(screen, game_over_text, FONT)
+            return_button = None
         elif app_state == "playing":
             draw_game_state(screen, gs,valid_moves, sq_selected)
-            scroll_offset_y = draw_side_panel(screen, gs, FONT, SMALL_FONT, scroll_offset_y,
+            scroll_offset_y, return_button = draw_side_panel(screen, gs, FONT, SMALL_FONT, scroll_offset_y,
                                               white_display_time, black_display_time, gs.white_to_move)
             if promotion_pending:
                 promotion_clicks = draw_promotion_menu(screen, turn)
@@ -499,7 +586,24 @@ def draw_side_panel(screen, gs, font, small_font, scroll_y,
     destination_rect = log_area_rect
     screen.blit(text_surface, destination_rect, source_rect)
 
-    return scroll_y
+    # return to menu button
+    button_width = 60
+    button_height = 40
+    button_x = panel_rect.right - button_width - padding
+    button_y = panel_rect.bottom - button_height - padding
+    return_button_rect = p.Rect(button_x, button_y, button_width, button_height)
+
+    # hover effect
+    mouse_pos = p.mouse.get_pos()
+    button_color = p.Color("gray")
+    if return_button_rect.collidepoint(mouse_pos):
+        button_color = p.Color("lightyellow")
+
+    p.draw.rect(screen, button_color, return_button_rect)
+    button_text = small_font.render("Back", True, p.Color("black"))
+    screen.blit(button_text, button_text.get_rect(center=return_button_rect.center))
+
+    return scroll_y, return_button_rect
 
 def draw_promotion_menu(screen, turn):
     menu_x = (WIDTH // 2) - (2 * SQ_SIZE)
@@ -546,28 +650,67 @@ def draw_check_highlight(screen, gs):
             s.fill(p.Color('red'))
             screen.blit(s, (c * SQ_SIZE, r * SQ_SIZE))
 
-def draw_menu(screen, mouse_pos, font, small_font):
+def draw_menu(screen, mouse_pos, font, small_font, min_str, inc_str, active_box):
     screen.fill(p.Color("black"))
-    font = p.font.SysFont("Arial", 32, bold=True, italic=False)
+    #font = p.font.SysFont("Arial", 32, bold=True, italic=False)
 
     # tit(s)le
     text = font.render("chASS", 1, p.Color("white"))
     text_react = text.get_rect(center=(WIDTH // 2, HEIGHT // 12))
     screen.blit(text, text_react)
 
+    # clock setting
+    input_y_pos = HEIGHT // 2 - 130
+    box_width = 80
+    box_height = 40
+    padding = 10
+
+    # min label and box
+    min_label = small_font.render("Mins:", 1, p.Color("white"))
+    min_label_rect = min_label.get_rect(midright=(WIDTH // 2 - padding, input_y_pos + box_height // 2))
+    screen.blit(min_label, min_label_rect)
+    min_box_rect = p.Rect(WIDTH // 2 + padding, input_y_pos, box_width, box_height)
+
+    # increment Label and Box
+    inc_label = small_font.render("Inc (s):", 1, p.Color("white"))
+    inc_label_rect = inc_label.get_rect(midright=(WIDTH // 2 - padding, input_y_pos + box_height + padding + box_height // 2))
+    screen.blit(inc_label, inc_label_rect)
+    inc_box_rect = p.Rect(WIDTH // 2 + padding, input_y_pos + box_height + padding, box_width, box_height)
+
+    # draw labels and texts
+    input_boxes_dict = {"min": min_box_rect, "inc": inc_box_rect}
+    for key, box_rect in input_boxes_dict.items():
+        border_color = p.Color("gray")
+        border_width = 2
+        if active_box == key: # highlight if active
+            border_color = p.Color("lightblue")
+            border_width = 3
+        
+        p.draw.rect(screen, p.Color("white"), box_rect) # background for text
+        p.draw.rect(screen, border_color, box_rect, border_width) # border
+
+        input_text = min_str if key == "min" else inc_str
+        text_surf = small_font.render(input_text, True, p.Color("black"))
+        screen.blit(text_surf, text_surf.get_rect(center=box_rect.center))
+
+    # buttons
+    button_y_start = inc_box_rect.bottom + 30
+    button_height = 50
+    button_spacing = 10
+
     buttons = {
         "pvp": {
-            "rect": p.Rect((WIDTH // 4), (HEIGHT // 2) - 60, (WIDTH // 2), 50),
+            "rect": p.Rect((WIDTH // 4), button_y_start, (WIDTH // 2), button_height),
             "text": "PvP",
             "desc": "Play a two-player (or solo) game locally."
         },
         "ai_classic": {
-            "rect": p.Rect((WIDTH // 4), (HEIGHT // 2) + 10, (WIDTH // 2), 50),
+            "rect": p.Rect((WIDTH // 4), button_y_start + button_height + button_spacing, (WIDTH // 2), button_height),
             "text": "PvAI",
             "desc": "Play against the fast, logic-based AI."
         },
         "ai_ml": {
-            "rect": p.Rect((WIDTH // 4), (HEIGHT // 2) + 80, (WIDTH // 2), 50),
+            "rect": p.Rect((WIDTH // 4), button_y_start + 2*(button_height + button_spacing), (WIDTH // 2), button_height),
             "text": "PvAI (ML)",
             "desc": "Play against the experimental machine learning AI."
         }
@@ -578,9 +721,10 @@ def draw_menu(screen, mouse_pos, font, small_font):
     explanation_text = ""
     button_rects_to_return = []
 
+    # draw buttons
     for key, button in buttons.items():
         color = color_default
-        if button["rect"].collidepoint(mouse_pos):
+        if button["rect"].collidepoint(mouse_pos): # check hover
             color = color_hover
             explanation_text = button["desc"]
         
@@ -590,12 +734,13 @@ def draw_menu(screen, mouse_pos, font, small_font):
         screen.blit(text_obj, text_obj.get_rect(center=button["rect"].center))
         button_rects_to_return.append(button["rect"])
     
+    # draw explanation for buttons
     if explanation_text:
         exp_text_obj = small_font.render(explanation_text, 1, p.Color("white"))
-        exp_text_rect = exp_text_obj.get_rect(center=(WIDTH // 2, (HEIGHT // 2) - 130))
+        exp_text_rect = exp_text_obj.get_rect(center=(WIDTH // 2, input_y_pos - 30))
         screen.blit(exp_text_obj, exp_text_rect)
     
-    return tuple(button_rects_to_return)
+    return tuple(button_rects_to_return), input_boxes_dict
 
 def draw_game_over(screen, text, font):
     menu_rect = p.Rect(0, 0, 400, 200)

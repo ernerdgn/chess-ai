@@ -8,7 +8,7 @@
 # IMAGES = {}
 
 class GameState():
-    def __init__(self):
+    def __init__(self, initial_time_mins=5.0, increment_secs=3.0):
         self.board = [
             [Piece("b", "R"), Piece("b", "N"), Piece("b", "B"), Piece("b", "Q"), Piece("b", "K"), Piece("b", "B"), Piece("b", "N"), Piece("b", "R")],
             [Piece("b", "p"), Piece("b", "p"), Piece("b", "p"), Piece("b", "p"), Piece("b", "p"), Piece("b", "p"), Piece("b", "p"), Piece("b", "p")],
@@ -29,29 +29,37 @@ class GameState():
         #     [Piece("w", "R"),None,None, None, Piece("w", "K"), None,None,Piece("w", "R")]
         # ]
 
+        # move and position
         self.white_to_move = True
         self.move_log = []
+        self.position_history = {}
 
+        # castling
         self.castle_rights = CastleRights(True, True, True, True)
         self.castle_rights_log = [self.castle_rights.copy()]
 
+        # en passant
         self.en_passant_target = None # (r,c) of target square
         self.en_passant_log = [self.en_passant_target]
 
+        # fifty-move rule
         self.fifty_move_counter = 0
         self.fifty_move_log = [0]
 
-        self.position_history = {}
+        # captured piece
         self.white_captured = [] # black pieces
         self.black_captured = [] # white pieces
 
-        self.position_history[self.get_game_state_hash()] = 1
-
-        self.white_time_left = 300.0
-        self.black_time_left = 300.0
-        self.increment = 3.0
+        # clock
+        initial_time_secs = initial_time_mins * 60
+        self.white_time_left = initial_time_secs
+        self.black_time_left = initial_time_secs
+        self.increment = float(increment_secs)
         self.white_time_log = [self.white_time_left]
         self.black_time_log = [self.black_time_left]
+        
+        # start pos hash
+        self.position_history[self.get_game_state_hash()] = 1
 
     def get_game_state_hash(self):
         board_string = ""
