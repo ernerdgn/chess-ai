@@ -10,11 +10,14 @@ DIMENSION = 8
 MAX_FPS = 15
 SQ_SIZE = HEIGHT // DIMENSION
 IMAGES = {}
+CAPTURED_IMAGES = {}
+CAPTURED_SQ_SIZE = 24
 
 def load_images():
     pieces = ['wp', 'wR', 'wN', 'wB', 'wK', 'wQ', 'bp', 'bR', 'bN', 'bB', 'bK', 'bQ']
     for piece in pieces:
         IMAGES[piece] = p.transform.scale(p.image.load("images/" + piece + ".png"), (SQ_SIZE, SQ_SIZE))
+        CAPTURED_IMAGES[piece] = p.transform.scale(p.image.load("images/" + piece + ".png"), (CAPTURED_SQ_SIZE, CAPTURED_SQ_SIZE))
 
 def main():
     p.init()
@@ -238,7 +241,7 @@ def main():
             game_over_button = draw_game_over(screen, game_over_text, FONT)
         elif app_state == "playing":
             draw_game_state(screen, gs,valid_moves, sq_selected)
-            draw_side_panel(screen, gs, SMALL_FONT, scroll_offset_y)
+            scroll_offset_y = draw_side_panel(screen, gs, FONT, SMALL_FONT, scroll_offset_y)
             if promotion_pending:
                 promotion_clicks = draw_promotion_menu(screen, turn)
             
@@ -266,59 +269,116 @@ def draw_pieces(screen, board):
                 image_name = piece.color + piece.type
                 screen.blit(IMAGES[image_name], p.Rect(c*SQ_SIZE, r*SQ_SIZE, SQ_SIZE, SQ_SIZE))
 
-def draw_side_panel(screen, gs, font, scroll_y):
-    panel_rect = p.Rect(512, 0, 256, HEIGHT) # x, y, width, height
-    p.draw.rect(screen, p.Color("black"), panel_rect) # Draw black background
+def draw_side_panel(screen, gs, font, small_font, scroll_y):
+    panel_rect = p.Rect(512, 0, 256, HEIGHT)
+    p.draw.rect(screen, p.Color("black"), panel_rect)
 
-    # == move log
     padding = 10
+    text_color = p.Color("white")
 
-    # log area
+    # areas
     log_area_width = 250
-    log_area_height = 172
+    log_area_height = 172 # can be changed
     log_area_x = panel_rect.x + (panel_rect.width - log_area_width) // 2
     log_area_y = panel_rect.y + (panel_rect.height - log_area_height) // 2
     log_area_rect = p.Rect(log_area_x, log_area_y, log_area_width, log_area_height)
 
-    #p.draw.rect(screen, p.Color("white"), log_area_rect, 1) # border move log (doesnt work?)
+    # area hights and positions
+    # available space above/below log
+    available_space_each = (panel_rect.height - log_area_height - 2 * padding) // 2
+    captured_area_height = max(CAPTURED_SQ_SIZE + padding, available_space_each)
 
-    # text
-    text_color = p.Color("white")
-    line_spacing = 5
+    # black captures above log
+    black_captures_y = log_area_rect.y - captured_area_height - padding
+    black_captures_rect = p.Rect(panel_rect.x + padding, black_captures_y,
+                                panel_rect.width - 2 * padding, captured_area_height)
+
+    # white captures below log
+    white_captures_y = log_area_rect.bottom + padding
+    white_captures_rect = p.Rect(panel_rect.x + padding, white_captures_y,
+                                panel_rect.width - 2 * padding, captured_area_height)
+
+    # draw captured pieces
+    material_diff = 0
+    piece_order = ['p', 'N', 'B', 'R', 'Q'] # order of display captures
+
+    # black captures
+    black_capture_counts = {'p': 0, 'N': 0, 'B': 0, 'R': 0, 'Q': 0}
+    for piece in gs.black_captured:
+        black_capture_counts[piece.type] += 1
+        material_diff -= ai.pst.piece_scores.get(piece.type, 0) # safety get
+
+    current_x = black_captures_rect.x
+    current_y = black_captures_rect.y + 130 # start is the top of the area
+    for piece_type in piece_order:
+        count = black_capture_counts[piece_type]
+        if count > 0:
+            if current_y + CAPTURED_SQ_SIZE <= black_captures_rect.bottom: # check vertical bounds
+                img = CAPTURED_IMAGES['w' + piece_type] # show piece
+                screen.blit(img, (current_x, current_y))
+                if count > 1:
+                    count_text = small_font.render(f"x{count}", True, text_color)
+                    screen.blit(count_text, (current_x + CAPTURED_SQ_SIZE - 10, current_y + CAPTURED_SQ_SIZE - 15))
+                current_x += CAPTURED_SQ_SIZE + 5
+
+    # white captures
+    white_capture_counts = {'p': 0, 'N': 0, 'B': 0, 'R': 0, 'Q': 0}
+    for piece in gs.white_captured:
+        white_capture_counts[piece.type] += 1
+        material_diff += ai.pst.piece_scores.get(piece.type, 0) # safety get
+
+    current_x = white_captures_rect.x
+    current_y = white_captures_rect.y # start is the top of the area
+    for piece_type in piece_order:
+        count = white_capture_counts[piece_type]
+        if count > 0:
+            if current_y + CAPTURED_SQ_SIZE <= white_captures_rect.bottom: # check vertical bounds
+                img = CAPTURED_IMAGES['b' + piece_type] # show piece
+                screen.blit(img, (current_x, current_y))
+                if count > 1:
+                    count_text = small_font.render(f"x{count}", True, text_color)
+                    screen.blit(count_text, (current_x + CAPTURED_SQ_SIZE - 10, current_y + CAPTURED_SQ_SIZE - 15))
+                current_x += CAPTURED_SQ_SIZE + 5
+
+    # display material difference
+    if material_diff != 0:
+        diff_sign = "+" if material_diff > 0 else ""
+        diff_text = small_font.render(f"Piece Diff.: ({diff_sign}{material_diff})", True, text_color)
+        screen.blit(diff_text, (black_captures_rect.right - diff_text.get_width() - 5, black_captures_rect.y + 5))
+
+    # draw move log
+    line_spacing = 3
     total_text_height = 0
-
     move_log = gs.move_log
     lines_to_render = []
     line_text = ""
-
     for i, move in enumerate(move_log):
-        move_number = (i // 2) + 1 # 1, 1, 2, 2, ...
-        
-        if i % 2 == 0:
-            line_text = f"{move_number}. {move.get_chess_notation()}"
-            if i == len(move_log) - 1:
-                 lines_to_render.append(line_text)
-                 text_object = font.render(line_text, True, text_color)
-                 total_text_height += text_object.get_height() + line_spacing
-        else:
-            line_text += f" {move.get_chess_notation()}"
-            lines_to_render.append(line_text)
-            text_object = font.render(line_text, True, text_color)
-            total_text_height += text_object.get_height() + line_spacing
-            line_text = ""
-    
-    if total_text_height > 0:
-        total_text_height -= line_spacing
+         move_number = (i // 2) + 1
+         if i % 2 == 0:
+             line_text = f"{move_number}. {move.get_chess_notation()}"
+             if i == len(move_log) - 1:
+                  lines_to_render.append(line_text)
+                  text_object = small_font.render(line_text, True, text_color)
+                  total_text_height += text_object.get_height() + line_spacing
+         else:
+             line_text += f" {move.get_chess_notation()}"
+             lines_to_render.append(line_text)
+             text_object = small_font.render(line_text, True, text_color)
+             total_text_height += text_object.get_height() + line_spacing
+             line_text = ""
 
-    # surface
+    if total_text_height > 0:
+         total_text_height -= line_spacing
+
+    # text surface
     text_surface_height = max(total_text_height, log_area_height)
     text_surface = p.Surface((log_area_width, text_surface_height))
-    text_surface.fill(p.Color("darkgrey"))
+    text_surface.fill(p.Color(59,59,59)) # darkgrey
 
     # render lines
     current_y_on_surface = 0
     for line in lines_to_render:
-        text_object = font.render(line, True, text_color)
+        text_object = small_font.render(line, True, text_color)
         text_rect = text_object.get_rect(centerx=log_area_width // 2, top=current_y_on_surface)
         text_surface.blit(text_object, text_rect)
         current_y_on_surface += text_object.get_height() + line_spacing
@@ -327,10 +387,9 @@ def draw_side_panel(screen, gs, font, scroll_y):
     max_scroll = max(0, total_text_height - log_area_height)
     scroll_y = max(0, min(scroll_y, max_scroll))
 
-    # draw visible part
+    # render visible part
     source_rect = p.Rect(0, scroll_y, log_area_width, log_area_height)
-    destination_rect = log_area_rect # where to draw on main screen
-    
+    destination_rect = log_area_rect
     screen.blit(text_surface, destination_rect, source_rect)
 
     return scroll_y

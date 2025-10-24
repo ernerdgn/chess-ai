@@ -31,7 +31,7 @@ class ChessCNN(nn.Module):
         x = self.tanh(x)
         return x
 
-MODEL_PATH = "chess_model_firstTrain.pth"
+MODEL_PATH = ""
 
 # set device cpu if cuda is not available
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")

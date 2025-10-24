@@ -31,8 +31,6 @@ class GameState():
 
         self.white_to_move = True
         self.move_log = []
-        # self.white_king_location = (7, 4)
-        # self.black_king_location = (0, 4)
 
         self.castle_rights = CastleRights(True, True, True, True)
         self.castle_rights_log = [self.castle_rights.copy()]
@@ -44,6 +42,8 @@ class GameState():
         self.fifty_move_log = [0]
 
         self.position_history = {}
+        self.white_captured = [] # black pieces
+        self.black_captured = [] # white pieces
 
         self.position_history[self.get_game_state_hash()] = 1
 
@@ -74,6 +74,13 @@ class GameState():
             self.board[move.end_row][move.end_col] = move.piece_moved
 
         self.move_log.append(move)
+
+        if move.piece_captured is not None:
+            if move.piece_captured.color == "w":
+                self.black_captured.append(move.piece_captured)
+            else:
+                self.white_captured.append(move.piece_captured)
+
         self.white_to_move = not self.white_to_move
         
         move.piece_moved.has_moved = True
@@ -125,6 +132,14 @@ class GameState():
             self.board[move.start_row][move.start_col] = move.piece_moved
             self.board[move.end_row][move.end_col] = move.piece_captured
             self.white_to_move = not self.white_to_move
+
+            if move.piece_captured is not None:
+                if move.piece_captured.color == 'w':
+                    if self.black_captured: # check if its empty
+                        self.black_captured.pop()
+                else:
+                    if self.white_captured: # check if its empty
+                        self.white_captured.pop()
 
             if move.was_first_move:
                 move.piece_moved.has_moved = False
