@@ -51,6 +51,14 @@ def main():
     game_over_text = ""
     scroll_offset_y = 0
 
+    min_insput_strt = "5" # default time 5+3
+    inc_input_str = "3"
+    active_input = None
+    input_boxes = {}
+    turn_start_time = p.time.get_ticks()
+    last_update_time = turn_start_time # for smoother display
+    white_display_time = gs.white_time_left
+    black_display_time = gs.black_time_left
 
     while running:
         turn = 'w' if gs.white_to_move else 'b'
@@ -66,14 +74,26 @@ def main():
                     if menu_buttons[0].collidepoint(location):
                         opponent_type = "human"
                         app_state = "playing"
+                        turn_start_time = p.time.get_ticks() # reset clock
+                        last_update_time = turn_start_time
+                        white_display_time = gs.white_time_left
+                        black_display_time = gs.black_time_left
                     elif menu_buttons[1].collidepoint(location):
                         #print("ai classic selected")
                         opponent_type = "ai_classic"
                         app_state = "playing"
+                        turn_start_time = p.time.get_ticks() # reset clock
+                        last_update_time = turn_start_time
+                        white_display_time = gs.white_time_left
+                        black_display_time = gs.black_time_left
                     elif menu_buttons[2].collidepoint(location):
                         #print("ai ml selected")
                         opponent_type = "ai_ml"
                         app_state = "playing"
+                        turn_start_time = p.time.get_ticks() # reset clock
+                        last_update_time = turn_start_time
+                        white_display_time = gs.white_time_left
+                        black_display_time = gs.black_time_left
             
             elif app_state == "game_over":
                 if e.type == p.MOUSEBUTTONDOWN and e.button == 1:
@@ -167,6 +187,29 @@ def main():
                                     for i in range(len(valid_moves)):
                                         if move == valid_moves[i]: # only non-promo moves
                                             gs.make_move(valid_moves[i])
+
+                                            final_elapsed_sec = (p.time.get_ticks() - turn_start_time) / 1000.0
+
+                                            if not gs.white_to_move:
+                                                pre_increment_time = gs.white_time_log[-2]
+                                                gs.white_time_left = pre_increment_time - final_elapsed_sec + gs.increment
+                                                gs.white_time_log[-1] = gs.white_time_left
+                                            else:
+                                                pre_increment_time = gs.black_time_log[-2]
+                                                gs.black_time_left = pre_increment_time - final_elapsed_sec + gs.increment
+                                                gs.black_time_log[-1] = gs.black_time_left
+
+                                            gs.white_time_left = max(0, gs.white_time_left)
+                                            gs.black_time_left = max(0, gs.black_time_left)
+
+                                            # sync display times
+                                            white_display_time = gs.white_time_left
+                                            black_display_time = gs.black_time_left
+
+                                            # reset timer for the next turn
+                                            turn_start_time = p.time.get_ticks()
+                                            last_update_time = turn_start_time
+
                                             print(move.get_chess_notation())
                                             move_made = True
                                             sq_selected = ()
@@ -188,6 +231,12 @@ def main():
                 elif e.type == p.KEYDOWN:
                     if e.key == p.K_u:
                         gs.undo_move()
+
+                        turn_start_time = p.time.get_ticks()
+                        last_update_time = turn_start_time
+                        white_display_time = gs.white_time_left
+                        black_display_time = gs.black_time_left
+
                         move_made = True
                         game_over = False
                         promotion_pending = False
@@ -195,13 +244,55 @@ def main():
                         game_over_text = ""
                         app_state = "playing"
 
-        
+        # end of event loop
+
         if app_state == "playing":
+            if not game_over:
+                current_time_ms = p.time.get_ticks()
+                elapsed_turn_time_sec = (current_time_ms - turn_start_time) / 1000.0 # elapsed time in seconds in this turn
+
+                # update display time (every 100ms)
+                if current_time_ms - last_update_time >= 100:
+                    if gs.white_to_move:
+                        white_display_time = gs.white_time_left - elapsed_turn_time_sec
+                    else:
+                        black_display_time = gs.black_time_left - elapsed_turn_time_sec
+                    last_update_time = current_time_ms
+
+                # check timeout
+                if (gs.white_to_move and white_display_time <= 0) or \
+                (not gs.white_to_move and black_display_time <= 0):
+
+                    game_over = True
+                    game_over_text = "black wins on time" if gs.white_to_move else "white wins on time"
+                    print(game_over_text)
+                    app_state = "game_over"
+                    game_over_button = () # reset
+
+                    # prevent display from showing negative time
+                    white_display_time = max(0, white_display_time)
+                    black_display_time = max(0, black_display_time)
+
             if not game_over and not promotion_pending and opponent_type != "human" and not gs.white_to_move:
-                #ai_move = ai.find_random_move(gs)
                 ai_move = ai.find_best_move(gs, opponent_type)
                 if ai_move:
                     gs.make_move(ai_move)
+
+                    final_elapsed_sec = (p.time.get_ticks() - turn_start_time) / 1000.0
+
+                    pre_increment_time = gs.black_time_log[-2]
+                    gs.black_time_left = pre_increment_time - final_elapsed_sec + gs.increment
+                    gs.black_time_log[-1] = gs.black_time_left
+
+                    gs.white_time_left = max(0, gs.white_time_left)
+                    gs.black_time_left = max(0, gs.black_time_left)
+
+                    white_display_time = gs.white_time_left
+                    black_display_time = gs.black_time_left
+
+                    turn_start_time = p.time.get_ticks()
+                    last_update_time = turn_start_time
+
                     print("ai move: " + ai_move.get_chess_notation())
                     move_made = True
 
@@ -241,7 +332,8 @@ def main():
             game_over_button = draw_game_over(screen, game_over_text, FONT)
         elif app_state == "playing":
             draw_game_state(screen, gs,valid_moves, sq_selected)
-            scroll_offset_y = draw_side_panel(screen, gs, FONT, SMALL_FONT, scroll_offset_y)
+            scroll_offset_y = draw_side_panel(screen, gs, FONT, SMALL_FONT, scroll_offset_y,
+                                              white_display_time, black_display_time, gs.white_to_move)
             if promotion_pending:
                 promotion_clicks = draw_promotion_menu(screen, turn)
             
@@ -269,52 +361,58 @@ def draw_pieces(screen, board):
                 image_name = piece.color + piece.type
                 screen.blit(IMAGES[image_name], p.Rect(c*SQ_SIZE, r*SQ_SIZE, SQ_SIZE, SQ_SIZE))
 
-def draw_side_panel(screen, gs, font, small_font, scroll_y):
+def draw_side_panel(screen, gs, font, small_font, scroll_y,
+                    w_time, b_time, white_turn):
     panel_rect = p.Rect(512, 0, 256, HEIGHT)
     p.draw.rect(screen, p.Color("black"), panel_rect)
 
     padding = 10
     text_color = p.Color("white")
+    active_clock_color = p.Color("yellow") # highlight active clock
 
     # areas
     log_area_width = 250
-    log_area_height = 172 # can be changed
+    log_area_height = 172
     log_area_x = panel_rect.x + (panel_rect.width - log_area_width) // 2
     log_area_y = panel_rect.y + (panel_rect.height - log_area_height) // 2
     log_area_rect = p.Rect(log_area_x, log_area_y, log_area_width, log_area_height)
 
-    # area hights and positions
-    # available space above/below log
-    available_space_each = (panel_rect.height - log_area_height - 2 * padding) // 2
-    captured_area_height = max(CAPTURED_SQ_SIZE + padding, available_space_each)
+    # leaving space for clocks
+    clock_height_estimate = font.get_height() + 10 # height needed for clock text + padding
+    available_space_each = (panel_rect.height - log_area_height - 2 * padding - 2 * clock_height_estimate) // 2
+    capture_area_height = max(CAPTURED_SQ_SIZE + padding, available_space_each)
 
-    # black captures above log
-    black_captures_y = log_area_rect.y - captured_area_height - padding
+    # black captures pos
+    black_captures_y = padding
     black_captures_rect = p.Rect(panel_rect.x + padding, black_captures_y,
-                                panel_rect.width - 2 * padding, captured_area_height)
+                                panel_rect.width - 2 * padding, capture_area_height)
 
-    # white captures below log
-    white_captures_y = log_area_rect.bottom + padding
+    # clock pos
+    black_clock_y = black_captures_rect.bottom + 5
+    white_clock_y = log_area_rect.bottom + 5
+
+    # white captures
+    white_captures_y = white_clock_y + clock_height_estimate
     white_captures_rect = p.Rect(panel_rect.x + padding, white_captures_y,
-                                panel_rect.width - 2 * padding, captured_area_height)
+                                panel_rect.width - 2 * padding, capture_area_height)
 
-    # draw captured pieces
+    # draw captures
     material_diff = 0
-    piece_order = ['p', 'N', 'B', 'R', 'Q'] # order of display captures
+    piece_order = ['p', 'N', 'B', 'R', 'Q']
 
     # black captures
     black_capture_counts = {'p': 0, 'N': 0, 'B': 0, 'R': 0, 'Q': 0}
     for piece in gs.black_captured:
         black_capture_counts[piece.type] += 1
-        material_diff -= ai.pst.piece_scores.get(piece.type, 0) # safety get
+        material_diff -= ai.pst.piece_scores.get(piece.type, 0)
 
     current_x = black_captures_rect.x
-    current_y = black_captures_rect.y + 130 # start is the top of the area
+    current_y = black_captures_rect.y
     for piece_type in piece_order:
         count = black_capture_counts[piece_type]
         if count > 0:
-            if current_y + CAPTURED_SQ_SIZE <= black_captures_rect.bottom: # check vertical bounds
-                img = CAPTURED_IMAGES['w' + piece_type] # show piece
+            if current_y + CAPTURED_SQ_SIZE <= black_captures_rect.bottom:
+                img = CAPTURED_IMAGES['w' + piece_type]
                 screen.blit(img, (current_x, current_y))
                 if count > 1:
                     count_text = small_font.render(f"x{count}", True, text_color)
@@ -325,26 +423,39 @@ def draw_side_panel(screen, gs, font, small_font, scroll_y):
     white_capture_counts = {'p': 0, 'N': 0, 'B': 0, 'R': 0, 'Q': 0}
     for piece in gs.white_captured:
         white_capture_counts[piece.type] += 1
-        material_diff += ai.pst.piece_scores.get(piece.type, 0) # safety get
+        material_diff += ai.pst.piece_scores.get(piece.type, 0)
 
     current_x = white_captures_rect.x
-    current_y = white_captures_rect.y # start is the top of the area
+    current_y = white_captures_rect.y
     for piece_type in piece_order:
         count = white_capture_counts[piece_type]
         if count > 0:
-            if current_y + CAPTURED_SQ_SIZE <= white_captures_rect.bottom: # check vertical bounds
-                img = CAPTURED_IMAGES['b' + piece_type] # show piece
+             if current_y + CAPTURED_SQ_SIZE <= white_captures_rect.bottom:
+                img = CAPTURED_IMAGES['b' + piece_type]
                 screen.blit(img, (current_x, current_y))
                 if count > 1:
                     count_text = small_font.render(f"x{count}", True, text_color)
                     screen.blit(count_text, (current_x + CAPTURED_SQ_SIZE - 10, current_y + CAPTURED_SQ_SIZE - 15))
                 current_x += CAPTURED_SQ_SIZE + 5
 
-    # display material difference
+    # material difference
     if material_diff != 0:
         diff_sign = "+" if material_diff > 0 else ""
-        diff_text = small_font.render(f"Piece Diff.: ({diff_sign}{material_diff})", True, text_color)
+        diff_text = small_font.render(f"({diff_sign}{material_diff})", True, text_color)
         screen.blit(diff_text, (black_captures_rect.right - diff_text.get_width() - 5, black_captures_rect.y + 5))
+
+    # draw clocks
+    black_time_str = format_time(b_time)
+    white_time_str = format_time(w_time)
+
+    black_text = font.render(black_time_str, True, active_clock_color if not white_turn else text_color)
+    white_text = font.render(white_time_str, True, active_clock_color if white_turn else text_color)
+
+    black_text_rect = black_text.get_rect(centerx=panel_rect.centerx, y=black_clock_y)
+    white_text_rect = white_text.get_rect(centerx=panel_rect.centerx, y=white_clock_y)
+
+    screen.blit(black_text, black_text_rect)
+    screen.blit(white_text, white_text_rect)
 
     # draw move log
     line_spacing = 3
@@ -370,12 +481,10 @@ def draw_side_panel(screen, gs, font, small_font, scroll_y):
     if total_text_height > 0:
          total_text_height -= line_spacing
 
-    # text surface
     text_surface_height = max(total_text_height, log_area_height)
     text_surface = p.Surface((log_area_width, text_surface_height))
-    text_surface.fill(p.Color(59,59,59)) # darkgrey
+    text_surface.fill(p.Color(34,34,34))
 
-    # render lines
     current_y_on_surface = 0
     for line in lines_to_render:
         text_object = small_font.render(line, True, text_color)
@@ -383,11 +492,9 @@ def draw_side_panel(screen, gs, font, small_font, scroll_y):
         text_surface.blit(text_object, text_rect)
         current_y_on_surface += text_object.get_height() + line_spacing
 
-    # scroll logic
     max_scroll = max(0, total_text_height - log_area_height)
     scroll_y = max(0, min(scroll_y, max_scroll))
 
-    # render visible part
     source_rect = p.Rect(0, scroll_y, log_area_width, log_area_height)
     destination_rect = log_area_rect
     screen.blit(text_surface, destination_rect, source_rect)
@@ -490,29 +597,6 @@ def draw_menu(screen, mouse_pos, font, small_font):
     
     return tuple(button_rects_to_return)
 
-    # # play w/human
-    # pvp_rect = p.Rect((WIDTH // 4), (HEIGHT // 2) - 60, (WIDTH // 2), 50)
-    # p.draw.rect(screen, p.Color("grey"), pvp_rect)
-    # text = font.render("PvP", 1, p.Color("black"))
-    # text_rect = text.get_rect(center=pvp_rect.center)
-    # screen.blit(text, text_rect)
-
-    # # play /w ai (classic)
-    # pvai_rect = p.Rect((WIDTH // 4), (HEIGHT // 2) + 10, (WIDTH // 2), 50)
-    # p.draw.rect(screen, p.Color("gray"), pvai_rect)
-    # text = font.render("PvAI", 1, p.Color("black"))
-    # text_rect = text.get_rect(center=pvai_rect.center)
-    # screen.blit(text, text_rect)
-
-    # # play w/ai(ML)
-    # pvml_rect = p.Rect((WIDTH // 4), (HEIGHT // 2) + 80, (WIDTH // 2), 50)
-    # p.draw.rect(screen, p.Color("gray"), pvml_rect)
-    # text = font.render("PvAI (ML)", 1, p.Color("black"))
-    # text_rect = text.get_rect(center=pvml_rect.center)
-    # screen.blit(text, text_rect)
-
-    # return pvp_rect, pvai_rect, pvml_rect
-
 def draw_game_over(screen, text, font):
     menu_rect = p.Rect(0, 0, 400, 200)
     menu_rect.center = (WIDTH // 2, HEIGHT // 2)
@@ -533,6 +617,13 @@ def draw_game_over(screen, text, font):
     screen.blit(text_obj, text_rect)
 
     return play_again_rect
+
+def format_time(seconds):
+    if seconds < 0: seconds = 0
+    minutes = int(seconds // 60)
+    secs = seconds % 60
+    tenths = int(max(0, (seconds - int(seconds))) * 10)
+    return f"{minutes:02}:{int(secs):02}.{tenths}"
 
 if __name__ == "__main__":
     main()

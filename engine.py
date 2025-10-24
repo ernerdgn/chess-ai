@@ -47,6 +47,12 @@ class GameState():
 
         self.position_history[self.get_game_state_hash()] = 1
 
+        self.white_time_left = 300.0
+        self.black_time_left = 300.0
+        self.increment = 3.0
+        self.white_time_log = [self.white_time_left]
+        self.black_time_log = [self.black_time_left]
+
     def get_game_state_hash(self):
         board_string = ""
         for r in range(8):
@@ -104,6 +110,17 @@ class GameState():
             self.fifty_move_counter += 1
         self.fifty_move_log.append(self.fifty_move_counter)
 
+        current_white_time = self.white_time_left
+        current_black_time = self.black_time_left
+
+        if not self.white_to_move:
+            self.white_time_left += self.increment
+        else:
+            self.black_time_left += self.increment
+        
+        self.white_time_log.append(self.white_time_left)
+        self.black_time_log.append(self.black_time_left)
+
         # castling
         if move.is_castle_move:
             if move.end_col - move.start_col == 2:
@@ -143,6 +160,12 @@ class GameState():
 
             if move.was_first_move:
                 move.piece_moved.has_moved = False
+
+            if len(self.white_time_log) > 1:
+                self.white_time_log.pop()
+                self.black_time_log.pop()
+            self.white_time_left = self.white_time_log[-1]
+            self.black_time_left = self.black_time_log[-1]
 
             # en passant
             self.en_passant_log.pop()
