@@ -1,9 +1,5 @@
 chess-ai
 
-TODO:
--train and preprocessing scripts will be added
+TODO:\n
+-train and preprocessing scripts will be added\n
 -will try to train a better model
-
--clock
--display move notation
--dragging pieces to move
