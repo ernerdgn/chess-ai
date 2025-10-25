@@ -60,6 +60,11 @@ def main():
     white_display_time = gs.white_time_left
     black_display_time = gs.black_time_left
 
+    # dragging
+    dragging = False
+    dragged_piece_pos = None
+    dragged_piece_image = None
+
     return_button = None
 
     while running:
@@ -229,88 +234,312 @@ def main():
                             row = location[1] // SQ_SIZE
                             # check if the click inside the board
                             if 0 <= row < DIMENSION and 0 <= col < DIMENSION:
-                                if sq_selected == (row, col):
-                                    sq_selected = ()
-                                    player_clicks = []
-                                else:
-                                    sq_selected = (row, col)
-                                    player_clicks.append(sq_selected)
+                                clicked_piece = gs.board[row][col]
+                                
+                                if len(player_clicks) == 0:
 
-                                if len(player_clicks) == 1:
-                                    if gs.board[row][col] is None:  #if clicked to an empty square
-                                        sq_selected = ()
-                                        player_clicks = []
-
-                                if len(player_clicks) == 2:
-                                    start_sq = player_clicks[0]
-                                    end_sq = player_clicks[1]
-                                    move = engine.Move(start_sq, end_sq, gs.board)
-                                    
-                                    
-                                    start_piece = gs.board[start_sq[0]][start_sq[1]]
-
-                                    is_promotion_click = False
-                                    if start_piece is not None and start_piece.type == 'p':
-                                        if (start_piece.color == 'w' and end_sq[0] == 0) or \
-                                            (start_piece.color == 'b' and end_sq[0] == 7):
-                                            is_promotion_click = True
-                                    
-                                    if is_promotion_click:
-                                        for vm in valid_moves:
-                                            if vm.start_row == start_sq[0] and vm.start_col == start_sq[1] and \
-                                                vm.end_row == end_sq[0] and vm.end_col == end_sq[1] and \
-                                                vm.promotion_choice is not None:
-                                                promotion_pending = True
-                                                pending_move = move
-                                                break
-                                        sq_selected = ()
-                                        player_clicks = []
-
+                                    if clicked_piece is not None and clicked_piece.color == ('w' if gs.white_to_move else 'b'):
+                                        sq_selected = (row, col)
+                                        player_clicks = [(row, col)]
+                                        dragging = True
+                                        dragged_piece_pos = (row, col)
+                                        dragged_piece_image = IMAGES[clicked_piece.color + clicked_piece.type]
+                                        print(f"select/drag started {sq_selected}")
                                     else:
-                                        for i in range(len(valid_moves)):
-                                            if move == valid_moves[i]: # only non-promo moves
-                                                gs.make_move(valid_moves[i])
+                                        sq_selected = ()
+                                        player_clicks = []
+                                
+                                elif len(player_clicks) == 1:
+                                    if sq_selected == (row, col): # same square selected
+                                        sq_selected = ()
+                                        player_clicks = []
+                                        dragging = False
+                                        dragged_piece_pos = None
+                                        dragged_piece_image = None
+                                    else:
+                                        player_clicks.append((row, col))
 
-                                                final_elapsed_sec = (p.time.get_ticks() - turn_start_time) / 1000.0
 
-                                                if not gs.white_to_move:
-                                                    pre_increment_time = gs.white_time_log[-2]
-                                                    gs.white_time_left = pre_increment_time - final_elapsed_sec + gs.increment
-                                                    gs.white_time_log[-1] = gs.white_time_left
-                                                else:
-                                                    pre_increment_time = gs.black_time_log[-2]
-                                                    gs.black_time_left = pre_increment_time - final_elapsed_sec + gs.increment
-                                                    gs.black_time_log[-1] = gs.black_time_left
-
-                                                gs.white_time_left = max(0, gs.white_time_left)
-                                                gs.black_time_left = max(0, gs.black_time_left)
-
-                                                # sync display times
-                                                white_display_time = gs.white_time_left
-                                                black_display_time = gs.black_time_left
-
-                                                # reset timer for the next turn
-                                                turn_start_time = p.time.get_ticks()
-                                                last_update_time = turn_start_time
-
-                                                print(move.get_chess_notation())
-                                                move_made = True
-                                                sq_selected = ()
-                                                player_clicks = []
-                                                break
+                                # elif not dragging:
+                                #     if sq_selected == (row,col): # same square selected
+                                #         sq_selected = ()
+                                #         player_clicks = []
+                                #     else:
+                                #         if len(player_clicks) == 0 and clicked_piece is None: # empty square
+                                #             sq_selected = ()
+                                #             player_clicks = []
+                                #         else:
+                                #             sq_selected = (row, col)
+                                #             player_clicks.append(sq_selected)
+                                #     if len(player_clicks) == 2: # click to click move
+                                #         start_sq = player_clicks[0]
+                                #         end_sq = player_clicks[1]
+                                #         move = engine.Move(start_sq, end_sq, gs.board)
                                         
-                                        if not move_made and not promotion_pending:
-                                            end_piece = gs.board[player_clicks[1][0]][player_clicks[1][1]]
-                                            if end_piece is not None and end_piece.color == start_piece.color:
-                                                sq_selected = player_clicks[1]
-                                                player_clicks = [sq_selected]
-                                            else:
-                                                sq_selected = ()
-                                                player_clicks = []
+                                #         start_piece = gs.board[start_sq[0]][start_sq[1]]
+
+                                #         is_promotion_click = False
+                                #         if start_piece is not None and start_piece.type == 'p':
+                                #             if (start_piece.color == 'w' and end_sq[0] == 0) or \
+                                #                 (start_piece.color == 'b' and end_sq[0] == 7):
+                                #                 is_promotion_click = True
+                                        
+                                #         if is_promotion_click:
+                                #             for vm in valid_moves:
+                                #                 if vm.start_row == start_sq[0] and vm.start_col == start_sq[1] and \
+                                #                     vm.end_row == end_sq[0] and vm.end_col == end_sq[1] and \
+                                #                     vm.promotion_choice is not None:
+                                #                     promotion_pending = True
+                                #                     pending_move = move
+                                #                     break
+                                #             sq_selected = ()
+                                #             player_clicks = []
+
+                                #         else:
+                                #             for i in range(len(valid_moves)):
+                                #                 if move == valid_moves[i]: # only non-promo moves
+                                #                     gs.make_move(valid_moves[i])
+
+                                #                     final_elapsed_sec = (p.time.get_ticks() - turn_start_time) / 1000.0
+
+                                #                     if not gs.white_to_move:
+                                #                         pre_increment_time = gs.white_time_log[-2]
+                                #                         gs.white_time_left = pre_increment_time - final_elapsed_sec + gs.increment
+                                #                         gs.white_time_log[-1] = gs.white_time_left
+                                #                     else:
+                                #                         pre_increment_time = gs.black_time_log[-2]
+                                #                         gs.black_time_left = pre_increment_time - final_elapsed_sec + gs.increment
+                                #                         gs.black_time_log[-1] = gs.black_time_left
+
+                                #                     gs.white_time_left = max(0, gs.white_time_left)
+                                #                     gs.black_time_left = max(0, gs.black_time_left)
+
+                                #                     # sync display times
+                                #                     white_display_time = gs.white_time_left
+                                #                     black_display_time = gs.black_time_left
+
+                                #                     # reset timer for the next turn
+                                #                     turn_start_time = p.time.get_ticks()
+                                #                     last_update_time = turn_start_time
+
+                                #                     print(move.get_chess_notation())
+                                #                     move_made = True
+                                #                     sq_selected = ()
+                                #                     player_clicks = []
+                                #                     break
+                                            
+                                #         if not move_made and not promotion_pending:
+                                #             end_piece = gs.board[player_clicks[1][0]][player_clicks[1][1]]
+                                #             if end_piece is not None and end_piece.color == start_piece.color:
+                                #                 sq_selected = player_clicks[1]
+                                #                 player_clicks = [sq_selected]
+                                #             else:
+                                #                 sq_selected = ()
+                                #                 player_clicks = []
+
+                                # if sq_selected == (row, col):
+                                #     sq_selected = ()
+                                #     player_clicks = []
+                                # else:
+                                #     sq_selected = (row, col)
+                                #     player_clicks.append(sq_selected)
+
+                                # if len(player_clicks) == 1:
+                                #     if gs.board[row][col] is None:  #if clicked to an empty square
+                                #         sq_selected = ()
+                                #         player_clicks = []
+
+                                # if len(player_clicks) == 2:
+                                #     start_sq = player_clicks[0]
+                                #     end_sq = player_clicks[1]
+                                #     move = engine.Move(start_sq, end_sq, gs.board)
+                                    
+                                    
+                                #     start_piece = gs.board[start_sq[0]][start_sq[1]]
+
+                                #     is_promotion_click = False
+                                #     if start_piece is not None and start_piece.type == 'p':
+                                #         if (start_piece.color == 'w' and end_sq[0] == 0) or \
+                                #             (start_piece.color == 'b' and end_sq[0] == 7):
+                                #             is_promotion_click = True
+                                    
+                                #     if is_promotion_click:
+                                #         for vm in valid_moves:
+                                #             if vm.start_row == start_sq[0] and vm.start_col == start_sq[1] and \
+                                #                 vm.end_row == end_sq[0] and vm.end_col == end_sq[1] and \
+                                #                 vm.promotion_choice is not None:
+                                #                 promotion_pending = True
+                                #                 pending_move = move
+                                #                 break
+                                #         sq_selected = ()
+                                #         player_clicks = []
+
+                                #     else:
+                                #         for i in range(len(valid_moves)):
+                                #             if move == valid_moves[i]: # only non-promo moves
+                                #                 gs.make_move(valid_moves[i])
+
+                                #                 final_elapsed_sec = (p.time.get_ticks() - turn_start_time) / 1000.0
+
+                                #                 if not gs.white_to_move:
+                                #                     pre_increment_time = gs.white_time_log[-2]
+                                #                     gs.white_time_left = pre_increment_time - final_elapsed_sec + gs.increment
+                                #                     gs.white_time_log[-1] = gs.white_time_left
+                                #                 else:
+                                #                     pre_increment_time = gs.black_time_log[-2]
+                                #                     gs.black_time_left = pre_increment_time - final_elapsed_sec + gs.increment
+                                #                     gs.black_time_log[-1] = gs.black_time_left
+
+                                #                 gs.white_time_left = max(0, gs.white_time_left)
+                                #                 gs.black_time_left = max(0, gs.black_time_left)
+
+                                #                 # sync display times
+                                #                 white_display_time = gs.white_time_left
+                                #                 black_display_time = gs.black_time_left
+
+                                #                 # reset timer for the next turn
+                                #                 turn_start_time = p.time.get_ticks()
+                                #                 last_update_time = turn_start_time
+
+                                #                 print(move.get_chess_notation())
+                                #                 move_made = True
+                                #                 sq_selected = ()
+                                #                 player_clicks = []
+                                #                 break
+                                        
+                                #         if not move_made and not promotion_pending:
+                                #             end_piece = gs.board[player_clicks[1][0]][player_clicks[1][1]]
+                                #             if end_piece is not None and end_piece.color == start_piece.color:
+                                #                 sq_selected = player_clicks[1]
+                                #                 player_clicks = [sq_selected]
+                                #             else:
+                                #                 sq_selected = ()
+                                #                 player_clicks = []
                             else: # click outside the board
                                 sq_selected = ()
                                 player_clicks = []
                 #
+                elif e.type == p.MOUSEMOTION:
+                    if dragging:
+                        pass
+
+                elif e.type == p.MOUSEBUTTONUP and e.button == 1: # left button release
+                    if dragging:
+                        dragging = False
+                        location = p.mouse.get_pos()
+                        end_col = location[0] // SQ_SIZE
+                        end_row = location[1] // SQ_SIZE
+
+                        if 0 <= end_row < DIMENSION and 0 <= end_col < DIMENSION and \
+                           dragged_piece_pos != (end_row, end_col):
+
+                            move = engine.Move(dragged_piece_pos, (end_row, end_col), gs.board)
+
+                            # is move valid
+                            valid_move_found = None
+                            is_promotion_drag = False
+                            for vm in valid_moves:
+                                if vm.start_row == move.start_row and vm.start_col == move.start_col and \
+                                   vm.end_row == move.end_row and vm.end_col == move.end_col:
+                                    
+                                    # promo possibility
+                                    start_piece = gs.board[move.start_row][move.start_col] # Get piece BEFORE undoing temp hide
+                                    if start_piece is not None and start_piece.type == 'p':
+                                        if (start_piece.color == 'w' and move.end_row == 0) or \
+                                           (start_piece.color == 'b' and move.end_row == 7):
+                                            is_promotion_drag = True
+                                            pending_move = move
+                                            valid_move_found = vm
+                                            break
+
+                                    if not is_promotion_drag and move == vm:
+                                        valid_move_found = vm
+                                        break
+
+                            # execute move
+                            if valid_move_found:
+                                if is_promotion_drag:
+                                    promotion_pending = True
+                                    # hold up a moment
+                                else:
+                                    gs.make_move(valid_move_found)
+                                    print(f"drag move: {valid_move_found.get_chess_notation()}")
+                                    # time fin and reset logic
+                                    final_elapsed_sec = (p.time.get_ticks() - turn_start_time) / 1000.0
+                                    if not gs.white_to_move: # white moved
+                                        pre_increment_time = gs.white_time_log[-2]
+                                        gs.white_time_left = pre_increment_time - final_elapsed_sec + gs.increment
+                                        gs.white_time_log[-1] = gs.white_time_left
+                                    else: # black moved
+                                        pre_increment_time = gs.black_time_log[-2]
+                                        gs.black_time_left = pre_increment_time - final_elapsed_sec + gs.increment
+                                        gs.black_time_log[-1] = gs.black_time_left
+                                    gs.white_time_left = max(0, gs.white_time_left)
+                                    gs.black_time_left = max(0, gs.black_time_left)
+                                    white_display_time = gs.white_time_left
+                                    black_display_time = gs.black_time_left
+                                    turn_start_time = p.time.get_ticks()
+                                    last_update_time = turn_start_time
+                                    move_made = True
+                            # else: # invalid drag, do nothing
+
+                        # reset
+                        dragged_piece_pos = None
+                        dragged_piece_image = None
+                        # sq_selected = ()
+                        # player_clicks = []
+                    if len(player_clicks) == 2:  # second click
+                        start_sq = player_clicks[0]
+                        end_sq = player_clicks[1]
+                        move = engine.Move(start_sq, end_sq, gs.board)
+                        start_piece = gs.board[start_sq[0]][start_sq[1]]
+
+                        is_promotion_click = False
+
+                        valid_move_found_cc = None
+                        if is_promotion_click:
+                            for vm in valid_moves:
+                                if vm.start_row == start_sq[0] and vm.start_col == start_sq[1] and \
+                                    vm.end_row == end_sq[0] and vm.end_col == end_sq[1] and \
+                                    vm.promotion_choice is not None:
+                                    valid_move_found_cc = vm
+                                    break
+                        else:
+                            for vm in valid_moves:
+                                if move == vm:
+                                    valid_move_found_cc = vm
+                                    break
+                        
+                        if valid_move_found_cc:
+                            if is_promotion_click:
+                                promotion_pending = True
+                                pending_move = move
+                            else:
+                                gs.make_move(valid_move_found_cc)
+                                print(f"click move: {valid_move_found_cc.get_chess_notation()}")
+                                final_elapsed_sec = (p.time.get_ticks() - turn_start_time) / 1000.0
+                                if not gs.white_to_move: # white moved
+                                    pre_increment_time = gs.white_time_log[-2]
+                                    gs.white_time_left = pre_increment_time - final_elapsed_sec + gs.increment
+                                    gs.white_time_log[-1] = gs.white_time_left
+                                else: # black moved
+                                    pre_increment_time = gs.black_time_log[-2]
+                                    gs.black_time_left = pre_increment_time - final_elapsed_sec + gs.increment
+                                    gs.black_time_log[-1] = gs.black_time_left
+                                gs.white_time_left = max(0, gs.white_time_left)
+                                gs.black_time_left = max(0, gs.black_time_left)
+                                white_display_time = gs.white_time_left
+                                black_display_time = gs.black_time_left
+                                turn_start_time = p.time.get_ticks()
+                                last_update_time = turn_start_time
+                                move_made = True
+
+                        sq_selected = ()
+                        player_clicks = []
+                        dragging = False
+                        dragged_piece_pos = None
+                        dragged_piece_image = None
+
                 elif e.type == p.KEYDOWN:
                     if e.key == p.K_u:
                         gs.undo_move()
@@ -418,20 +647,28 @@ def main():
             game_over_button = draw_game_over(screen, game_over_text, FONT)
             return_button = None
         elif app_state == "playing":
-            draw_game_state(screen, gs,valid_moves, sq_selected)
+            draw_game_state(screen, gs,valid_moves, sq_selected,
+                            dragging, dragged_piece_pos)
+            
+            if dragging and dragged_piece_image:
+                center_x = mouse_pos[0] - SQ_SIZE // 2
+                center_y = mouse_pos[1] - SQ_SIZE // 2
+                screen.blit(dragged_piece_image, (center_x, center_y))
+            
             scroll_offset_y, return_button = draw_side_panel(screen, gs, FONT, SMALL_FONT, scroll_offset_y,
                                               white_display_time, black_display_time, gs.white_to_move)
+            
             if promotion_pending:
                 promotion_clicks = draw_promotion_menu(screen, turn)
             
         clock.tick(MAX_FPS)
         p.display.flip()
 
-def draw_game_state(screen, gs, valid_moves, sq_selected):
+def draw_game_state(screen, gs, valid_moves, sq_selected, dragging, dragged_pos):
     draw_board(screen)
     draw_check_highlight(screen, gs)
     highlight_squares(screen, gs, valid_moves, sq_selected)
-    draw_pieces(screen, gs.board)
+    draw_pieces(screen, gs.board, dragging, dragged_pos)
 
 def draw_board(screen):
     colors = [p.Color("white"), p.Color("grey")]
@@ -440,13 +677,15 @@ def draw_board(screen):
             color = colors[((r + c) % 2)]
             p.draw.rect(screen, color, p.Rect(c * SQ_SIZE, r * SQ_SIZE, SQ_SIZE, SQ_SIZE))
 
-def draw_pieces(screen, board):
+def draw_pieces(screen, board, dragging, dragged_pos):
     for r in range(DIMENSION):
         for c in range(DIMENSION):
             piece = board[r][c]
             if piece is not None:
-                image_name = piece.color + piece.type
-                screen.blit(IMAGES[image_name], p.Rect(c*SQ_SIZE, r*SQ_SIZE, SQ_SIZE, SQ_SIZE))
+                is_dragged_piece = dragging and dragged_pos == (r, c)
+                if not is_dragged_piece:
+                    image_name = piece.color + piece.type
+                    screen.blit(IMAGES[image_name], p.Rect(c*SQ_SIZE, r*SQ_SIZE, SQ_SIZE, SQ_SIZE))
 
 def draw_side_panel(screen, gs, font, small_font, scroll_y,
                     w_time, b_time, white_turn):
