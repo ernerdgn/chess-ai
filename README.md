@@ -59,7 +59,7 @@ Two distinct AI opponents are available:
 
 1.  **Clone the repository:**
     ```bash
-    git clone <your-repo-url>
+    git clone https://github.com/ernerdgn/chess-ai.git
     cd <your-repo-directory>
     ```
 2.  **Install dependencies:**
