@@ -894,7 +894,7 @@ def draw_menu(screen, mouse_pos, font, small_font, min_str, inc_str, active_box)
     #font = p.font.SysFont("Arial", 32, bold=True, italic=False)
 
     # tit(s)le
-    text = font.render("chASS", 1, p.Color("white"))
+    text = font.render("chess!", 1, p.Color("white"))
     text_react = text.get_rect(center=(WIDTH // 2, HEIGHT // 12))
     screen.blit(text, text_react)
 
