@@ -625,8 +625,8 @@ def main():
                 
                 if gs.fifty_move_counter >= 100: # a play for each side counts as one move
                     game_over = True
-                    game_over_text = "drawn, fifty-move rule"
-                    #print("drawn by fifty-move rule")
+                    game_over_text = "draw, fifty-move rule"
+                    #print("draw by fifty-move rule")
 
                 if gs.check_insufficient_material():
                     game_over = True
